@@ -4,7 +4,7 @@ import api from '../../services/api';
 import '../user/travel.css';
 import './admin.css';
 
-const base = import.meta.env.VITE_PHP_BASE_URL || (import.meta.env.DEV ? 'http://localhost/Yatra' : '/Yatra');
+const base = import.meta.env.VITE_PHP_BASE_URL || (import.meta.env.DEV ? 'http://127.0.0.1:8001' : '');
 const links = [
   ['Destinations', `${base}/admin/destinations.php`],
   ['Activities', `${base}/admin/activities.php`],

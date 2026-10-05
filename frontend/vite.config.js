@@ -4,13 +4,18 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   server: {
-    port: 5173,
+    port: 5180,
+    strictPort: true,
     proxy: {
       '/api': {
-        target: process.env.PATHYATRA_PHP_URL || 'http://localhost/Yatra',
+        target: process.env.PATHYATRA_PHP_URL || 'http://127.0.0.1:8001',
         changeOrigin: true,
         secure: false,
       },
     },
+  },
+  preview: {
+    port: 4180,
+    strictPort: true,
   },
 });

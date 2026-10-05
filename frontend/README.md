@@ -4,7 +4,9 @@ React/Vite is the traveler-facing interface. PHP endpoints in the repository's `
 
 ## Local setup
 
-Follow the repository root [setup guide](../README.md) to import the database, run PHP, and start Vite. For a cloned folder with PHP's built-in server at `127.0.0.1:8000`, set both `PATHYATRA_PHP_URL` (the Vite API proxy target) and `VITE_PHP_BASE_URL` (the admin links) to `http://127.0.0.1:8000`. Neither setting depends on the cloned folder name.
+Follow the repository root [setup guide](../README.md) to import the database, run PHP on `127.0.0.1:8001`, and start Vite. Open **`http://localhost:5180`** for the refreshed interface. The API proxy and development admin links default to port 8001, so `npm run dev` needs no URL overrides for this setup.
+
+For XAMPP or a different PHP server, set `PATHYATRA_PHP_URL` (the Vite API proxy target) and `VITE_PHP_BASE_URL` (the admin links) to that project's actual PHP URL before starting Vite. Replace any old values pointing to the original project. The frontend uses port 5180 strictly; preview uses 4180 strictly.
 
 `npm run build` creates a production bundle in `dist/`. Deploying the bundle still requires routing `/api` to the PHP endpoints and a fallback to the SPA entry page for React routes.
 
