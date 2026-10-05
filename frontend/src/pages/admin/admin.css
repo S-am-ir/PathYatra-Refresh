@@ -1,0 +1,12 @@
+.admin-links { display: flex; flex-wrap: wrap; gap: .7rem; margin-bottom: 2.5rem; }
+.admin-links a { padding: .75rem 1rem; border: 1px solid #c6ccbd; color: #315742; font-size: .82rem; font-weight: 700; }
+.admin-links a:hover { background: #e7ece3; }
+.admin-metrics { display: grid; grid-template-columns: repeat(4,1fr); border: 1px solid #cfd6c9; background: #e9eee6; }
+.admin-metrics > div { display: flex; flex-direction: column; gap: .6rem; padding: 1.5rem; border-right: 1px solid #cfd6c9; }
+.admin-metrics > div:last-child { border: 0; }
+.admin-metrics span { color: #667969; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.admin-metrics strong { font: 400 2.5rem var(--font-display); }
+.admin-chart { margin-top: 3rem; padding: 2rem; border: 1px solid #d8d0c1; background: #fcfaf5; }
+.admin-chart h2 { font: 400 clamp(1.8rem,3vw,2.6rem) var(--font-display); margin: .5rem 0 1.5rem; }
+.admin-chart__plot { width: 100%; height: 320px; }
+@media (max-width: 750px) { .admin-metrics { grid-template-columns: repeat(2,1fr); } .admin-metrics > div { border-bottom: 1px solid #cfd6c9; } }

@@ -1,0 +1,2911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>YatraPath — Let the path find you</title>
+<meta name="description" content="YatraPath builds a personal morning-to-evening itinerary across Nepal in under three seconds. Season-aware. Budget-smart. Route-optimised.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400;1,500&family=Inter:wght@300;400;500;600&family=Noto+Serif+Devanagari:wght@300;400&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════
+   TOKENS
+═══════════════════════════════════════════════════ */
+:root {
+  --ink:        #0F1A22;
+  --pine:       #1E3A34;
+  --slate:      #2B3A45;
+  --snow:       #F4EFE6;
+  --paper:      #EAE3D6;
+  --marigold:   #C8973A;
+  --terracotta: #B4533A;
+  --sage:       #8FA58A;
+  --stone:      #A39B8D;
+  --stone-lt:   #C8C0B4;
+
+  --ease-out:    cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.76, 0, 0.24, 1);
+  --ease-soft:   cubic-bezier(0.33, 1, 0.68, 1);
+
+  --dur-micro: 160ms;
+  --dur-ui:    380ms;
+  --dur-reveal:800ms;
+
+  --font-display: 'Cormorant Garamond', Georgia, serif;
+  --font-body:    'Inter', system-ui, sans-serif;
+  --font-deva:    'Noto Serif Devanagari', serif;
+
+  --nav-h: 68px;
+  --section-pad: clamp(5rem, 10vw, 9rem);
+  --gap: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+/* ═══════════════════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+body {
+  font-family: var(--font-body);
+  background: var(--snow);
+  color: var(--ink);
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+body.intro-active { overflow: hidden; }
+img { display: block; max-width: 100%; }
+a { color: inherit; text-decoration: none; }
+button { border: none; background: none; cursor: pointer; font: inherit; }
+
+/* Paper grain */
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.04;
+}
+
+/* Skip link */
+.skip-link {
+  position: fixed; top: -100%; left: 1rem;
+  background: var(--marigold); color: var(--ink);
+  padding: 0.5rem 1rem; border-radius: 4px;
+  font-size: 0.875rem; font-weight: 500; z-index: 99999;
+  transition: top 0.2s;
+}
+.skip-link:focus { top: 1rem; }
+
+/* Scroll progress */
+#scroll-progress {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 2px;
+  background: var(--marigold);
+  transform-origin: left;
+  transform: scaleX(0);
+  z-index: 9998;
+  transition: transform 0.05s linear;
+}
+
+/* ═══════════════════════════════════════════════════
+   INTRO OVERLAY
+═══════════════════════════════════════════════════ */
+#intro {
+  position: fixed; inset: 0;
+  background: var(--ink);
+  z-index: 9000;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+#intro.done { pointer-events: none; }
+
+#intro-logo-wrap {
+  will-change: transform, opacity, filter;
+  transform-origin: center center;
+}
+#intro-logo-wrap img {
+  width: 220px; height: auto;
+  display: block;
+}
+
+#intro-skip {
+  position: absolute; bottom: 2rem; right: 2rem;
+  color: rgba(244,239,230,0.35);
+  font-size: 0.75rem; letter-spacing: 0.12em;
+  font-family: var(--font-body);
+}
+
+/* ═══════════════════════════════════════════════════
+   NAVBAR
+═══════════════════════════════════════════════════ */
+#navbar {
+  position: fixed; top: 0; left: 0; right: 0;
+  height: var(--nav-h);
+  z-index: 800;
+  transition: background var(--dur-ui) var(--ease-soft),
+              box-shadow var(--dur-ui) var(--ease-soft),
+              transform var(--dur-ui) var(--ease-soft);
+}
+#navbar.scrolled {
+  background: rgba(244,239,230,0.92);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  box-shadow: 0 1px 0 rgba(15,26,34,0.08);
+}
+#navbar.hidden { transform: translateY(-100%); }
+
+.nav-inner {
+  max-width: 1280px; margin: 0 auto;
+  height: 100%;
+  display: flex; align-items: center;
+  padding: 0 clamp(1.25rem, 4vw, 2.5rem);
+  gap: 2rem;
+}
+
+#nav-logo {
+  flex-shrink: 0;
+  visibility: hidden; /* shown after intro handoff */
+}
+#nav-logo img { width: 140px; height: auto; }
+
+.nav-links {
+  display: flex; gap: 0.25rem;
+  margin-left: auto;
+}
+.nav-links a {
+  font-size: 0.875rem; font-weight: 400;
+  color: var(--snow); padding: 0.5rem 0.75rem;
+  position: relative; letter-spacing: 0.01em;
+  transition: color var(--dur-micro) var(--ease-out);
+}
+#navbar.scrolled .nav-links a { color: var(--slate); }
+.nav-links a::after {
+  content: ''; position: absolute;
+  bottom: 4px; left: 0.75rem; right: 0.75rem;
+  height: 1px; background: var(--marigold);
+  transform: scaleX(0); transform-origin: left;
+  transition: transform var(--dur-ui) var(--ease-out);
+}
+.nav-links a:hover::after { transform: scaleX(1); }
+.nav-links a:hover { color: var(--snow); }
+#navbar.scrolled .nav-links a:hover { color: var(--ink); }
+
+.nav-actions {
+  display: flex; align-items: center; gap: 0.75rem;
+  margin-left: 1.5rem;
+}
+.nav-login {
+  font-size: 0.875rem; font-weight: 400;
+  color: rgba(244,239,230,0.75);
+  padding: 0.5rem 0.75rem;
+  transition: color var(--dur-micro);
+}
+#navbar.scrolled .nav-login { color: var(--stone); }
+.nav-login:hover { color: var(--snow) !important; }
+#navbar.scrolled .nav-login:hover { color: var(--ink) !important; }
+
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  background: var(--marigold); color: var(--ink);
+  font-size: 0.875rem; font-weight: 600;
+  padding: 0.55rem 1.25rem; border-radius: 100px;
+  position: relative; overflow: hidden;
+  transition: transform var(--dur-micro), box-shadow var(--dur-micro);
+}
+.btn-primary::before {
+  content: ''; position: absolute;
+  inset: 0; background: rgba(255,255,255,0.15);
+  transform: translateX(-101%);
+  transition: transform 350ms var(--ease-soft);
+}
+.btn-primary:hover::before { transform: translateX(0); }
+.btn-primary:hover { box-shadow: 0 4px 16px rgba(200,151,58,0.3); }
+.btn-primary:active { transform: scale(0.98); }
+
+#hamburger {
+  display: none; flex-direction: column; gap: 5px;
+  padding: 0.5rem; cursor: pointer; margin-left: auto;
+}
+#hamburger span {
+  width: 22px; height: 1.5px;
+  background: var(--snow);
+  transition: transform 0.3s, opacity 0.3s, background 0.3s;
+}
+#navbar.scrolled #hamburger span { background: var(--ink); }
+
+/* Mobile menu */
+#mobile-menu {
+  position: fixed; inset: 0;
+  background: var(--ink);
+  z-index: 850; display: flex;
+  flex-direction: column; align-items: center; justify-content: center;
+  gap: 2rem;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.35s var(--ease-soft);
+}
+#mobile-menu.open { opacity: 1; pointer-events: all; }
+#mobile-menu a {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 8vw, 3rem);
+  color: var(--snow); font-weight: 300;
+  opacity: 0; transform: translateY(20px);
+  transition: opacity 0.4s, transform 0.4s;
+}
+#mobile-menu.open a { opacity: 1; transform: translateY(0); }
+#mobile-menu.open a:nth-child(1) { transition-delay: 0.05s; }
+#mobile-menu.open a:nth-child(2) { transition-delay: 0.10s; }
+#mobile-menu.open a:nth-child(3) { transition-delay: 0.15s; }
+#mobile-menu.open a:nth-child(4) { transition-delay: 0.20s; }
+#mobile-menu.open a:nth-child(5) { transition-delay: 0.25s; }
+#menu-close {
+  position: absolute; top: 1.5rem; right: 1.5rem;
+  color: var(--stone); font-size: 1.5rem; cursor: pointer;
+}
+
+/* ═══════════════════════════════════════════════════
+   HERO
+═══════════════════════════════════════════════════ */
+#hero {
+  position: relative;
+  height: 100dvh; min-height: 600px;
+  display: flex; flex-direction: column;
+  align-items: flex-start; justify-content: center;
+  overflow: hidden;
+}
+
+/* Slideshow */
+.hero-slides { position: absolute; inset: 0; }
+.hero-slide {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  opacity: 0;
+  transition: opacity 1.2s var(--ease-soft);
+  transform-origin: center;
+}
+.hero-slide.active {
+  opacity: 1;
+  animation: kenburns 22s linear forwards;
+}
+.hero-slide.exiting { opacity: 0; }
+
+@keyframes kenburns {
+  from { transform: scale(1); }
+  to   { transform: scale(1.07); }
+}
+
+/* Gradient overlays */
+.hero-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(
+    to right,
+    rgba(15,26,34,0.75) 0%,
+    rgba(15,26,34,0.45) 55%,
+    rgba(15,26,34,0.15) 100%
+  );
+  pointer-events: none;
+}
+.hero-overlay-bottom {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 30%;
+  background: linear-gradient(to top, rgba(15,26,34,0.5), transparent);
+  pointer-events: none;
+}
+
+/* Ridge silhouettes */
+.ridge-wrap {
+  position: absolute; bottom: -2px; left: 0; right: 0;
+  pointer-events: none; z-index: 2;
+}
+.ridge { position: absolute; bottom: 0; left: 0; right: 0; width: 100%; }
+
+/* Mist layers */
+.mist {
+  position: absolute; inset: 0;
+  pointer-events: none; overflow: hidden;
+}
+.mist-band {
+  position: absolute; width: 200%; height: 35%;
+  background: linear-gradient(transparent, rgba(244,239,230,0.06), transparent);
+  animation: mistDrift 70s linear infinite;
+}
+.mist-band:nth-child(2) {
+  top: 40%; animation-duration: 90s;
+  animation-direction: reverse; opacity: 0.6;
+}
+@keyframes mistDrift {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* Prayer flags */
+.flags-wrap {
+  position: absolute; top: var(--nav-h); right: 0;
+  width: 260px; pointer-events: none; z-index: 3;
+  transform-origin: top right;
+  animation: flagSway 7s ease-in-out infinite;
+}
+@keyframes flagSway {
+  0%,100% { transform: rotate(-1deg) skewX(-1deg); }
+  50%      { transform: rotate(1deg)  skewX(1deg); }
+}
+
+/* Hero content */
+.hero-content {
+  position: relative; z-index: 4;
+  max-width: 1280px; width: 100%; margin: 0 auto;
+  padding: 0 clamp(1.25rem,4vw,2.5rem);
+  padding-top: var(--nav-h);
+}
+
+.hero-eyebrow {
+  font-family: var(--font-deva);
+  font-size: 0.875rem; letter-spacing: 0.08em;
+  color: rgba(244,239,230,0.6);
+  margin-bottom: 1.25rem;
+  opacity: 0; transform: translateY(16px);
+  transition: opacity 0.7s var(--ease-out) 1.3s,
+              transform 0.7s var(--ease-out) 1.3s;
+}
+.hero-eyebrow.visible { opacity: 1; transform: none; }
+
+.hero-h1 {
+  font-family: var(--font-display);
+  font-size: clamp(3.2rem, 8vw, 7rem);
+  font-weight: 300; line-height: 1.0;
+  color: var(--snow);
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+.hero-h1-inner {
+  opacity: 0; transform: translateY(110%);
+  transition: opacity 0.8s var(--ease-out) 1.4s,
+              transform 0.8s var(--ease-out) 1.4s;
+}
+.hero-h1-inner.visible { opacity: 1; transform: none; }
+.hero-h1 em { font-style: italic; color: rgba(200,151,58,0.9); }
+
+/* Word rotator */
+.hero-ticker {
+  display: flex; align-items: center; gap: 0.75rem;
+  margin-bottom: 1.5rem;
+  opacity: 0; transform: translateY(12px);
+  transition: opacity 0.7s var(--ease-out) 1.55s,
+              transform 0.7s var(--ease-out) 1.55s;
+}
+.hero-ticker.visible { opacity: 1; transform: none; }
+.ticker-label {
+  font-size: 0.875rem; color: rgba(244,239,230,0.45);
+  font-weight: 300; letter-spacing: 0.04em;
+}
+.ticker-slot {
+  height: 1.6em; overflow: hidden;
+  position: relative; min-width: 240px;
+}
+.ticker-word {
+  font-family: var(--font-display);
+  font-size: 1.5rem; font-weight: 300; font-style: italic;
+  color: var(--snow); line-height: 1.6em;
+  position: absolute; width: 100%;
+  transition: transform 0.6s var(--ease-in-out),
+              opacity 0.6s var(--ease-in-out);
+}
+.ticker-word.current  { transform: translateY(0);    opacity: 1; }
+.ticker-word.next     { transform: translateY(110%);  opacity: 0; }
+.ticker-word.exiting  { transform: translateY(-110%); opacity: 0; }
+
+.hero-sub {
+  font-size: clamp(0.95rem, 1.6vw, 1.1rem);
+  color: rgba(244,239,230,0.7);
+  max-width: 480px; line-height: 1.65;
+  font-weight: 300;
+  opacity: 0; transform: translateY(12px);
+  transition: opacity 0.7s var(--ease-out) 1.65s,
+              transform 0.7s var(--ease-out) 1.65s;
+  margin-bottom: 2.5rem;
+}
+.hero-sub.visible { opacity: 1; transform: none; }
+
+/* Quick Search */
+#quick-search {
+  display: flex; align-items: stretch; gap: 0;
+  background: var(--snow);
+  border-radius: 12px;
+  box-shadow: 0 8px 40px rgba(15,26,34,0.25);
+  overflow: hidden;
+  max-width: 680px;
+  opacity: 0; transform: translateY(16px);
+  transition: opacity 0.7s var(--ease-out) 1.75s,
+              transform 0.7s var(--ease-out) 1.75s;
+}
+#quick-search.visible { opacity: 1; transform: none; }
+.qs-field {
+  flex: 1; padding: 1rem 1.25rem;
+  border-right: 1px solid rgba(163,155,141,0.2);
+  position: relative;
+}
+.qs-field:last-of-type { border-right: none; }
+.qs-label {
+  display: block; font-size: 0.68rem;
+  letter-spacing: 0.08em; color: var(--stone);
+  margin-bottom: 0.3rem; font-weight: 500;
+  text-transform: uppercase;
+}
+.qs-input {
+  width: 100%; border: none; outline: none;
+  font-family: var(--font-body); font-size: 0.95rem;
+  color: var(--ink); background: transparent;
+}
+.qs-input::placeholder { color: var(--stone-lt); }
+.qs-stepper {
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.qs-stepper button {
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 1px solid var(--stone-lt);
+  font-size: 1rem; line-height: 1;
+  color: var(--stone); display: flex;
+  align-items: center; justify-content: center;
+  cursor: pointer; background: transparent;
+  transition: border-color var(--dur-micro), color var(--dur-micro);
+}
+.qs-stepper button:hover { border-color: var(--marigold); color: var(--marigold); }
+.qs-days-val {
+  font-size: 0.95rem; font-weight: 500;
+  color: var(--ink); min-width: 2ch; text-align: center;
+}
+.qs-meta {
+  margin-top: 0.25rem;
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.qs-tier {
+  font-size: 0.72rem; padding: 0.2rem 0.6rem;
+  border-radius: 100px; font-weight: 500;
+  background: rgba(200,151,58,0.12); color: var(--marigold);
+  transition: background 0.3s, color 0.3s;
+}
+.qs-per-day {
+  font-size: 0.72rem; color: var(--stone);
+}
+.qs-cta {
+  padding: 0 1.5rem; cursor: pointer;
+  background: var(--marigold); color: var(--ink);
+  font-weight: 600; font-size: 0.875rem;
+  display: flex; align-items: center; gap: 0.5rem;
+  position: relative; overflow: hidden;
+  flex-shrink: 0; white-space: nowrap;
+  transition: background var(--dur-micro);
+}
+.qs-cta:hover { background: #d6a340; }
+.qs-cta svg { transition: transform var(--dur-micro); }
+.qs-cta:hover svg { transform: translateX(3px); }
+
+/* Scroll cue */
+.scroll-cue {
+  position: absolute; bottom: 2.5rem; left: 50%;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center;
+  gap: 0.5rem; z-index: 4;
+  opacity: 0; transition: opacity 0.6s var(--ease-out) 2s;
+  color: rgba(244,239,230,0.45);
+  font-size: 0.7rem; letter-spacing: 0.1em;
+}
+.scroll-cue.visible { opacity: 1; }
+.scroll-cue-line {
+  width: 1px; height: 44px;
+  background: linear-gradient(to bottom, rgba(244,239,230,0.4), transparent);
+  animation: scrollPulse 2s ease-in-out infinite;
+}
+@keyframes scrollPulse {
+  0%,100% { transform: scaleY(1); opacity: 0.5; }
+  50%      { transform: scaleY(1.3); opacity: 1; }
+}
+
+/* Hero caption */
+.hero-caption {
+  position: absolute; bottom: 5rem; right: clamp(1.25rem,4vw,2.5rem);
+  z-index: 4; text-align: right;
+}
+.hero-caption-text {
+  font-size: 0.7rem; color: rgba(244,239,230,0.4);
+  letter-spacing: 0.06em; font-variant: small-caps;
+  transition: opacity 0.6s;
+}
+.hero-progress {
+  margin-top: 0.5rem; height: 1px;
+  background: rgba(244,239,230,0.15); border-radius: 1px;
+  overflow: hidden; width: 100px; margin-left: auto;
+}
+.hero-progress-bar {
+  height: 100%; background: rgba(200,151,58,0.6);
+  transform-origin: left; transform: scaleX(0);
+  transition: transform linear;
+}
+
+/* Season widget */
+.season-widget {
+  position: absolute; top: calc(var(--nav-h) + 1.5rem); right: clamp(1.25rem,4vw,2.5rem);
+  z-index: 4; text-align: right;
+}
+.season-widget-inner {
+  background: rgba(15,26,34,0.45);
+  border: 1px solid rgba(244,239,230,0.1);
+  backdrop-filter: blur(4px);
+  border-radius: 8px; padding: 0.75rem 1rem;
+}
+.season-time {
+  font-size: 1.1rem; font-weight: 300;
+  color: var(--snow); letter-spacing: 0.04em;
+  font-family: var(--font-display);
+}
+.season-name {
+  font-size: 0.7rem; color: var(--marigold);
+  letter-spacing: 0.08em; margin-top: 0.2rem;
+}
+.season-tip {
+  font-size: 0.68rem; color: rgba(244,239,230,0.5);
+  margin-top: 0.15rem; max-width: 160px;
+}
+
+/* Trust strip */
+.trust-strip {
+  display: flex; gap: clamp(1rem,3vw,2.5rem);
+  flex-wrap: wrap;
+  padding: 1.5rem clamp(1.25rem,4vw,2.5rem);
+  background: rgba(15,26,34,0.55);
+  backdrop-filter: blur(4px);
+  position: relative; z-index: 4;
+}
+.trust-item {
+  display: flex; align-items: center; gap: 0.5rem;
+  font-size: 0.78rem; color: rgba(244,239,230,0.65);
+  letter-spacing: 0.04em;
+}
+.trust-dot {
+  width: 4px; height: 4px; border-radius: 50%;
+  background: var(--marigold); flex-shrink: 0;
+}
+
+/* Hero ridge curve */
+.hero-curve {
+  position: absolute; bottom: -1px; left: 0; right: 0; z-index: 3;
+  line-height: 0;
+}
+.hero-curve svg { width: 100%; display: block; }
+
+/* ═══════════════════════════════════════════════════
+   MARQUEE
+═══════════════════════════════════════════════════ */
+#marquee {
+  background: var(--paper);
+  border-top: 1px solid rgba(163,155,141,0.2);
+  border-bottom: 1px solid rgba(163,155,141,0.2);
+  overflow: hidden; padding: 1rem 0;
+}
+.marquee-track {
+  display: flex; gap: 0; white-space: nowrap;
+  width: max-content;
+  animation: marqueeScroll 40s linear infinite;
+}
+#marquee:hover .marquee-track { animation-play-state: paused; }
+@keyframes marqueeScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.marquee-item {
+  display: inline-flex; align-items: center; gap: 1.5rem;
+  font-family: var(--font-display);
+  font-size: clamp(0.875rem, 1.5vw, 1rem);
+  color: var(--stone); font-weight: 300;
+  letter-spacing: 0.04em; padding: 0 1.5rem;
+}
+.marquee-glyph {
+  color: var(--marigold); opacity: 0.6;
+  font-size: 0.6em; line-height: 1;
+}
+
+/* ═══════════════════════════════════════════════════
+   HOW IT WORKS
+═══════════════════════════════════════════════════ */
+#how {
+  background: var(--snow);
+  padding: var(--section-pad) clamp(1.25rem,4vw,2.5rem);
+  position: relative; overflow: hidden;
+}
+.topo-bg {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0.04;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='400'%3E%3Ccircle cx='200' cy='200' r='160' fill='none' stroke='%23A39B8D' stroke-width='1'/%3E%3Ccircle cx='200' cy='200' r='120' fill='none' stroke='%23A39B8D' stroke-width='1'/%3E%3Ccircle cx='200' cy='200' r='80' fill='none' stroke='%23A39B8D' stroke-width='1'/%3E%3Ccircle cx='200' cy='200' r='40' fill='none' stroke='%23A39B8D' stroke-width='1'/%3E%3C/svg%3E");
+  background-size: 400px 400px;
+}
+.how-inner {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: clamp(3rem,6vw,6rem); align-items: start;
+}
+.how-left {}
+.section-eyebrow {
+  font-size: 0.72rem; letter-spacing: 0.12em;
+  color: var(--stone); font-weight: 500;
+  text-transform: uppercase; margin-bottom: 1rem;
+  display: flex; align-items: center; gap: 0.75rem;
+}
+.section-eyebrow::before {
+  content: ''; width: 2rem; height: 1px;
+  background: var(--marigold); display: block;
+}
+.section-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 4.5vw, 4rem);
+  font-weight: 300; line-height: 1.1;
+  color: var(--ink); letter-spacing: -0.02em;
+  margin-bottom: 1.25rem;
+}
+.section-h2 em { font-style: italic; color: var(--terracotta); }
+.how-steps { margin-top: 3rem; position: relative; }
+.how-path-line {
+  position: absolute; left: 14px; top: 24px;
+  width: 1px; bottom: 0;
+  background: linear-gradient(to bottom, var(--marigold), rgba(200,151,58,0.1));
+}
+.how-step {
+  display: flex; gap: 2rem; margin-bottom: 3rem;
+  position: relative; z-index: 1;
+}
+.how-step-num {
+  font-family: var(--font-deva);
+  font-size: 0.75rem; color: var(--marigold);
+  letter-spacing: 0.06em; flex-shrink: 0;
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid rgba(200,151,58,0.3);
+  display: flex; align-items: center; justify-content: center;
+  background: var(--snow);
+}
+.how-step-body {}
+.how-step h3 {
+  font-family: var(--font-display);
+  font-size: 1.4rem; font-weight: 400;
+  color: var(--ink); margin-bottom: 0.5rem;
+}
+.how-step p {
+  font-size: 0.9rem; line-height: 1.7;
+  color: var(--stone); max-width: 340px;
+}
+.how-right {
+  position: sticky; top: calc(var(--nav-h) + 2rem);
+}
+.how-panel {
+  border-radius: 16px; overflow: hidden;
+  background: var(--paper);
+  border: 1px solid rgba(163,155,141,0.2);
+  aspect-ratio: 4/3; position: relative;
+  display: flex; align-items: center; justify-content: center;
+}
+.how-panel-inner {
+  padding: 2rem; width: 100%;
+}
+.mock-card {
+  background: white; border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 4px 24px rgba(15,26,34,0.06);
+}
+.mock-card-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid rgba(163,155,141,0.12);
+}
+.mock-card-row:last-child { border-bottom: none; }
+.mock-time {
+  font-size: 0.7rem; color: var(--stone);
+  width: 55px; flex-shrink: 0;
+}
+.mock-act {
+  font-size: 0.875rem; color: var(--ink);
+  flex: 1;
+}
+.mock-cost {
+  font-size: 0.75rem; color: var(--marigold);
+  font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════
+   ENGINE DEMO
+═══════════════════════════════════════════════════ */
+#engine {
+  background: var(--paper);
+  padding: var(--section-pad) clamp(1.25rem,4vw,2.5rem);
+  position: relative; overflow: hidden;
+}
+.engine-bg-blur {
+  position: absolute; inset: 0;
+  background: linear-gradient(135deg,
+    rgba(30,58,52,0.06) 0%,
+    rgba(200,151,58,0.04) 100%);
+  pointer-events: none;
+}
+.engine-inner {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 1fr 1.2fr;
+  gap: clamp(3rem,6vw,5rem); align-items: start;
+}
+.engine-controls {}
+.engine-control-group { margin-bottom: 2rem; }
+.engine-label {
+  font-size: 0.72rem; letter-spacing: 0.1em;
+  color: var(--stone); text-transform: uppercase;
+  font-weight: 500; margin-bottom: 0.75rem;
+}
+.season-tabs {
+  display: flex; gap: 0.5rem; flex-wrap: wrap;
+}
+.season-tab {
+  padding: 0.4rem 0.9rem; border-radius: 100px;
+  border: 1px solid rgba(163,155,141,0.3);
+  font-size: 0.8rem; color: var(--stone);
+  cursor: pointer; transition: all var(--dur-micro);
+  background: transparent;
+}
+.season-tab.active {
+  background: var(--ink); color: var(--snow);
+  border-color: var(--ink);
+}
+.budget-slider-wrap { position: relative; }
+#budget-slider {
+  width: 100%; appearance: none;
+  height: 2px; border-radius: 2px;
+  background: linear-gradient(to right,
+    var(--marigold) var(--pct,50%),
+    rgba(163,155,141,0.3) var(--pct,50%));
+  outline: none; cursor: pointer;
+}
+#budget-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px; height: 16px;
+  border-radius: 50%; background: var(--marigold);
+  box-shadow: 0 0 0 3px rgba(200,151,58,0.2);
+}
+.budget-display {
+  display: flex; justify-content: space-between;
+  margin-top: 0.75rem;
+}
+.budget-val {
+  font-family: var(--font-display);
+  font-size: 1.2rem; color: var(--ink);
+}
+.budget-tier-chip {
+  display: inline-flex; align-items: center;
+  padding: 0.25rem 0.75rem; border-radius: 100px;
+  font-size: 0.72rem; font-weight: 500;
+  background: rgba(200,151,58,0.12);
+  color: var(--marigold);
+  transition: background 0.4s, color 0.4s;
+}
+.interest-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.interest-chip {
+  padding: 0.4rem 0.9rem; border-radius: 100px;
+  border: 1px solid rgba(163,155,141,0.3);
+  font-size: 0.8rem; color: var(--stone);
+  cursor: pointer; transition: all var(--dur-micro);
+  background: transparent;
+}
+.interest-chip.selected {
+  border-color: var(--marigold);
+  color: var(--ink); background: rgba(200,151,58,0.08);
+}
+.algo-stepper {
+  margin-top: 2rem; padding-top: 2rem;
+  border-top: 1px solid rgba(163,155,141,0.2);
+}
+.algo-step {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.5rem 0; font-size: 0.8rem;
+  color: var(--stone-lt);
+  transition: color 0.3s;
+}
+.algo-step.active { color: var(--ink); }
+.algo-step-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--stone-lt); flex-shrink: 0;
+  transition: background 0.3s, transform 0.3s;
+}
+.algo-step.active .algo-step-dot {
+  background: var(--marigold);
+  transform: scale(1.5);
+}
+.algo-status {
+  font-size: 0.72rem; color: var(--marigold);
+  margin-top: 0.25rem; padding-left: 1.5rem;
+  font-style: italic; min-height: 1em;
+  transition: opacity 0.3s;
+}
+
+/* Engine result card */
+.engine-result {}
+.day-card {
+  background: white; border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(15,26,34,0.08);
+}
+.day-card-header {
+  background: var(--ink); padding: 1.25rem 1.5rem;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.day-card-title {
+  font-family: var(--font-display);
+  font-size: 1.1rem; color: var(--snow); font-weight: 300;
+}
+.day-card-budget {
+  font-size: 0.8rem; color: rgba(244,239,230,0.55);
+}
+.day-slots { padding: 0; }
+.day-slot {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(163,155,141,0.12);
+  display: grid; grid-template-columns: 80px 1fr auto;
+  gap: 1rem; align-items: start;
+  transition: opacity 0.4s, transform 0.4s;
+}
+.day-slot:last-child { border-bottom: none; }
+.slot-time {
+  font-size: 0.72rem; color: var(--stone);
+  letter-spacing: 0.04em; padding-top: 2px;
+}
+.slot-name {
+  font-size: 0.95rem; color: var(--ink); font-weight: 400;
+}
+.slot-desc {
+  font-size: 0.78rem; color: var(--stone);
+  margin-top: 0.2rem; line-height: 1.5;
+}
+.slot-cost {
+  font-size: 0.8rem; color: var(--marigold);
+  font-weight: 500; text-align: right; white-space: nowrap;
+}
+.budget-bar-wrap {
+  padding: 1rem 1.5rem 1.25rem;
+  border-top: 1px solid rgba(163,155,141,0.12);
+}
+.budget-bar-label {
+  display: flex; justify-content: space-between;
+  font-size: 0.72rem; color: var(--stone);
+  margin-bottom: 0.5rem;
+}
+.budget-bar {
+  height: 4px; background: rgba(163,155,141,0.2);
+  border-radius: 4px; overflow: hidden;
+}
+.budget-bar-fill {
+  height: 100%; background: var(--marigold);
+  border-radius: 4px;
+  transition: width 0.7s var(--ease-soft);
+}
+.engine-caption {
+  margin-top: 1rem; font-size: 0.78rem;
+  color: var(--stone); font-style: italic;
+  background: rgba(200,151,58,0.06);
+  border-left: 2px solid rgba(200,151,58,0.3);
+  padding: 0.6rem 0.9rem; border-radius: 0 6px 6px 0;
+  transition: opacity 0.4s;
+}
+
+/* ═══════════════════════════════════════════════════
+   FEATURED DESTINATIONS
+═══════════════════════════════════════════════════ */
+#destinations {
+  background: var(--snow);
+  padding: var(--section-pad) clamp(1.25rem,4vw,2.5rem);
+}
+.destinations-inner { max-width: 1280px; margin: 0 auto; }
+.section-header {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  margin-bottom: clamp(2rem,4vw,3.5rem);
+}
+.view-all {
+  font-size: 0.85rem; color: var(--stone);
+  display: flex; align-items: center; gap: 0.4rem;
+  transition: color var(--dur-micro), gap var(--dur-micro);
+}
+.view-all::after {
+  content: '→'; transition: transform var(--dur-micro);
+}
+.view-all:hover { color: var(--ink); gap: 0.6rem; }
+.view-all:hover::after { transform: translateX(3px); }
+
+/* Asymmetric grid */
+.dest-grid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 1rem;
+}
+.dest-card {
+  position: relative; overflow: hidden;
+  border-radius: 12px; cursor: pointer;
+  background: var(--paper);
+}
+.dest-card:first-child {
+  grid-row: 1 / 3;
+  /* tall feature card */
+}
+.dest-card-img-wrap {
+  width: 100%; overflow: hidden;
+  height: 100%;
+}
+.dest-card:first-child .dest-card-img-wrap { min-height: 480px; }
+.dest-card:not(:first-child) .dest-card-img-wrap { height: 220px; }
+.dest-card-img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  transition: transform 0.8s var(--ease-out);
+}
+.dest-card:hover .dest-card-img { transform: scale(1.05); }
+.dest-card-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(15,26,34,0.75) 0%, transparent 55%);
+  pointer-events: none;
+}
+.dest-card-body {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 1.25rem;
+}
+.dest-name {
+  font-family: var(--font-display);
+  font-size: 1.3rem; color: var(--snow);
+  font-weight: 400; line-height: 1.2;
+  position: relative; display: inline-block;
+}
+.dest-name::after {
+  content: ''; position: absolute;
+  bottom: -3px; left: 0; width: 0; height: 1px;
+  background: var(--marigold);
+  transition: width 0.4s var(--ease-out);
+}
+.dest-card:hover .dest-name::after { width: 100%; }
+.dest-region { font-size: 0.72rem; color: rgba(244,239,230,0.5); margin-top: 0.25rem; }
+.dest-meta {
+  display: flex; gap: 0.75rem; align-items: center; margin-top: 0.6rem;
+}
+.dest-cost {
+  font-size: 0.78rem; color: rgba(244,239,230,0.7);
+}
+.dest-stars { display: flex; gap: 2px; }
+.star {
+  width: 10px; height: 10px;
+  background: var(--marigold);
+  clip-path: polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);
+  opacity: 0.3;
+}
+.star.filled { opacity: 1; }
+.dest-hover-cta {
+  position: absolute; bottom: 1.25rem; right: 1.25rem;
+  font-size: 0.75rem; color: rgba(244,239,230,0.5);
+  display: flex; align-items: center; gap: 0.3rem;
+  transform: translateY(8px); opacity: 0;
+  transition: transform 0.3s var(--ease-out), opacity 0.3s;
+}
+.dest-card:hover .dest-hover-cta {
+  transform: translateY(0); opacity: 1;
+}
+
+/* ═══════════════════════════════════════════════════
+   MAP TEASER
+═══════════════════════════════════════════════════ */
+#map-teaser {
+  background: var(--ink);
+  padding: var(--section-pad) clamp(1.25rem,4vw,2.5rem);
+  position: relative; overflow: hidden;
+}
+.map-inner {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: clamp(3rem,5vw,5rem); align-items: center;
+}
+.map-copy .section-eyebrow { color: rgba(163,155,141,0.7); }
+.map-copy .section-h2 { color: var(--snow); }
+.map-sub {
+  font-size: 0.95rem; color: rgba(244,239,230,0.55);
+  line-height: 1.7; max-width: 400px; margin-top: 1rem;
+}
+.map-chips { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 2rem; }
+.map-chip {
+  padding: 0.5rem 1rem; border-radius: 100px;
+  border: 1px solid rgba(244,239,230,0.1);
+  font-size: 0.78rem; color: rgba(244,239,230,0.6);
+  display: flex; align-items: center; gap: 0.5rem;
+}
+.map-chip-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--marigold); }
+.map-visual {
+  border-radius: 16px; overflow: hidden;
+  background: var(--slate); height: 380px;
+  position: relative;
+}
+/* SVG map of Nepal outline */
+.nepal-map-svg {
+  width: 100%; height: 100%;
+  object-fit: contain; padding: 1.5rem;
+}
+
+/* ═══════════════════════════════════════════════════
+   INTEREST CAROUSEL
+═══════════════════════════════════════════════════ */
+#interests {
+  background: var(--snow);
+  padding: var(--section-pad) 0;
+  overflow: hidden;
+}
+.interests-header {
+  max-width: 1280px; margin: 0 auto;
+  padding: 0 clamp(1.25rem,4vw,2.5rem);
+  margin-bottom: 2.5rem;
+  display: flex; justify-content: space-between; align-items: flex-end;
+}
+.interest-cta-wrap { flex-shrink: 0; }
+.interest-tiles {
+  display: flex; gap: 1rem;
+  padding: 0 clamp(1.25rem,4vw,2.5rem);
+  overflow-x: auto; scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.interest-tiles::-webkit-scrollbar { display: none; }
+.interest-tile {
+  flex-shrink: 0; width: clamp(220px,28vw,320px);
+  height: 400px; border-radius: 14px; overflow: hidden;
+  position: relative; cursor: pointer; scroll-snap-align: start;
+  transition: box-shadow var(--dur-ui);
+}
+.interest-tile.selected {
+  box-shadow: 0 0 0 2px var(--marigold), 0 8px 32px rgba(200,151,58,0.2);
+}
+.interest-tile-bg {
+  position: absolute; inset: 0;
+  background-size: cover; background-position: center;
+  transition: transform 0.6s var(--ease-out);
+}
+.interest-tile:hover .interest-tile-bg { transform: scale(1.04); }
+.interest-tile-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(15,26,34,0.85) 0%, rgba(15,26,34,0.2) 60%, transparent 100%);
+}
+.interest-tile-body {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 1.5rem;
+}
+.interest-icon {
+  width: 32px; height: 32px; margin-bottom: 0.75rem;
+  opacity: 0.9;
+}
+.interest-name {
+  font-family: var(--font-display);
+  font-size: 1.3rem; color: var(--snow); font-weight: 400;
+}
+.interest-sub {
+  font-size: 0.75rem; color: rgba(244,239,230,0.5);
+  margin-top: 0.25rem;
+}
+.interest-check {
+  position: absolute; top: 1rem; right: 1rem;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--marigold);
+  display: flex; align-items: center; justify-content: center;
+  opacity: 0; transform: scale(0.5);
+  transition: opacity 0.25s, transform 0.25s var(--ease-out);
+}
+.interest-tile.selected .interest-check {
+  opacity: 1; transform: scale(1);
+}
+.interests-cta {
+  max-width: 1280px; margin: 2rem auto 0;
+  padding: 0 clamp(1.25rem,4vw,2.5rem);
+  display: flex; justify-content: center;
+}
+
+/* ═══════════════════════════════════════════════════
+   TRENDING ITINERARIES
+═══════════════════════════════════════════════════ */
+#trending {
+  background: var(--paper);
+  padding: var(--section-pad) clamp(1.25rem,4vw,2.5rem);
+}
+.trending-inner { max-width: 1280px; margin: 0 auto; }
+.tickets-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem; margin-top: 2.5rem;
+}
+.ticket {
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 16px rgba(15,26,34,0.06);
+  transition: transform var(--dur-ui) var(--ease-out),
+              box-shadow var(--dur-ui);
+  cursor: pointer;
+}
+.ticket:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(15,26,34,0.1);
+}
+.ticket-header {
+  background: var(--ink); padding: 1rem 1.25rem;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.ticket-dest {
+  font-family: var(--font-display);
+  font-size: 1rem; color: var(--snow); font-weight: 400;
+}
+.ticket-days {
+  font-size: 0.72rem; color: rgba(244,239,230,0.45);
+}
+.ticket-perf {
+  border-left: 10px dashed var(--paper);
+  border-right: 10px dashed var(--paper);
+  margin: 0; height: 0;
+  position: relative;
+}
+.ticket-perf::before, .ticket-perf::after {
+  content: ''; position: absolute; top: -8px;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--paper);
+}
+.ticket-perf::before { left: -18px; }
+.ticket-perf::after { right: -18px; }
+.ticket-body { padding: 1.25rem; }
+.ticket-route {
+  display: flex; align-items: center; gap: 0.4rem;
+  flex-wrap: wrap; margin-bottom: 1rem;
+}
+.ticket-city {
+  font-size: 0.78rem; color: var(--ink); font-weight: 500;
+}
+.ticket-arrow {
+  width: 16px; height: 1px;
+  background: linear-gradient(to right, var(--stone-lt), var(--marigold));
+  position: relative; flex-shrink: 0;
+}
+.ticket-arrow::after {
+  content: ''; position: absolute; right: -1px; top: -3px;
+  border: 3px solid transparent;
+  border-left-color: var(--marigold);
+}
+.ticket-meta {
+  display: flex; gap: 0.75rem; flex-wrap: wrap;
+}
+.ticket-chip {
+  font-size: 0.7rem; padding: 0.2rem 0.6rem;
+  border-radius: 100px; background: var(--paper);
+  color: var(--stone);
+}
+.ticket-chip.budget { background: rgba(200,151,58,0.1); color: var(--marigold); }
+.ticket-footer {
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid rgba(163,155,141,0.12);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.ticket-saves { font-size: 0.72rem; color: var(--stone); }
+.ticket-use {
+  font-size: 0.75rem; color: var(--marigold);
+  font-weight: 500; letter-spacing: 0.02em;
+  transition: gap 0.2s;
+  display: flex; align-items: center; gap: 0.3rem;
+}
+.ticket-use:hover { gap: 0.5rem; }
+
+/* ═══════════════════════════════════════════════════
+   STATS
+═══════════════════════════════════════════════════ */
+#stats {
+  background: var(--ink);
+  padding: var(--section-pad) clamp(1.25rem,4vw,2.5rem);
+}
+.stats-inner {
+  max-width: 1280px; margin: 0 auto;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 2rem;
+}
+.stat-item { text-align: center; }
+.stat-num {
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 6vw, 5rem);
+  color: var(--snow); font-weight: 300;
+  line-height: 1; letter-spacing: -0.02em;
+}
+.stat-num span { color: var(--marigold); }
+.stat-label {
+  font-size: 0.75rem; color: var(--stone);
+  letter-spacing: 0.1em; text-transform: uppercase;
+  margin-top: 0.5rem; font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════
+   STORIES / REVIEWS
+═══════════════════════════════════════════════════ */
+#stories {
+  background: var(--pine);
+  padding: var(--section-pad) clamp(1.25rem,4vw,2.5rem);
+  position: relative; overflow: hidden;
+}
+.stories-watermark {
+  position: absolute; bottom: -2rem; right: -1rem;
+  font-family: var(--font-deva);
+  font-size: clamp(8rem, 20vw, 16rem);
+  color: rgba(244,239,230,0.04);
+  line-height: 1; pointer-events: none; user-select: none;
+}
+.stories-inner { max-width: 900px; margin: 0 auto; position: relative; }
+.stories-inner .section-eyebrow { color: rgba(163,155,141,0.55); }
+.stories-inner .section-h2 { color: var(--snow); }
+.quote-slider { margin-top: 3rem; position: relative; min-height: 220px; }
+.quote-slide {
+  position: absolute; inset: 0;
+  opacity: 0; transition: opacity 0.8s var(--ease-soft);
+  pointer-events: none;
+}
+.quote-slide.active { opacity: 1; pointer-events: all; }
+.quote-text {
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 3vw, 2rem);
+  color: var(--snow); font-weight: 300; font-style: italic;
+  line-height: 1.4; margin-bottom: 1.5rem;
+}
+.quote-text::before { content: '"'; color: var(--marigold); }
+.quote-text::after  { content: '"'; color: var(--marigold); }
+.quote-author {
+  display: flex; align-items: center; gap: 0.75rem;
+}
+.quote-avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--slate);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.78rem; color: var(--snow); font-weight: 500;
+}
+.quote-meta {}
+.quote-name { font-size: 0.85rem; color: rgba(244,239,230,0.8); font-weight: 500; }
+.quote-trip { font-size: 0.75rem; color: rgba(163,155,141,0.6); }
+.quote-nav {
+  display: flex; gap: 0.5rem; margin-top: 2rem; align-items: center;
+}
+.quote-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: rgba(244,239,230,0.2); cursor: pointer;
+  transition: background 0.3s, transform 0.3s;
+}
+.quote-dot.active {
+  background: var(--marigold); transform: scale(1.3);
+}
+
+/* ═══════════════════════════════════════════════════
+   FINAL CTA
+═══════════════════════════════════════════════════ */
+#final-cta {
+  background: var(--pine);
+  padding: var(--section-pad) clamp(1.25rem,4vw,2.5rem);
+  position: relative; overflow: hidden;
+}
+.cta-ridges {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  pointer-events: none;
+}
+.cta-inner {
+  max-width: 780px; margin: 0 auto;
+  text-align: center; position: relative; z-index: 2;
+}
+.cta-h2 {
+  font-family: var(--font-display);
+  font-size: clamp(2.5rem, 5.5vw, 5rem);
+  color: var(--snow); font-weight: 300;
+  line-height: 1.05; letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+}
+.cta-h2 em { font-style: italic; color: rgba(200,151,58,0.85); }
+.cta-sub {
+  font-size: 1rem; color: rgba(244,239,230,0.55);
+  margin-bottom: 2.5rem; line-height: 1.6;
+}
+.cta-btns {
+  display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;
+}
+.btn-outline {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  border: 1px solid rgba(244,239,230,0.2); color: rgba(244,239,230,0.7);
+  font-size: 0.95rem; font-weight: 400;
+  padding: 0.75rem 1.75rem; border-radius: 100px;
+  transition: border-color var(--dur-micro), color var(--dur-micro);
+}
+.btn-outline:hover { border-color: rgba(244,239,230,0.5); color: var(--snow); }
+.cta-flags {
+  position: absolute; top: 0; left: 0; right: 0;
+  pointer-events: none; overflow: hidden; height: 60px;
+}
+
+/* ═══════════════════════════════════════════════════
+   FOOTER
+═══════════════════════════════════════════════════ */
+#footer {
+  background: var(--ink);
+  padding: 4rem clamp(1.25rem,4vw,2.5rem) 2rem;
+  position: relative; overflow: hidden;
+}
+.footer-deva {
+  position: absolute; bottom: -1rem; left: 50%; transform: translateX(-50%);
+  font-family: var(--font-deva);
+  font-size: clamp(5rem, 15vw, 10rem);
+  color: rgba(244,239,230,0.03);
+  white-space: nowrap; pointer-events: none; user-select: none;
+}
+.footer-inner {
+  max-width: 1280px; margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: clamp(2rem,4vw,4rem);
+  position: relative; z-index: 1;
+}
+.footer-brand img { width: 130px; margin-bottom: 1rem; }
+.footer-slogan {
+  font-family: var(--font-display);
+  font-size: 1rem; color: rgba(244,239,230,0.4);
+  font-style: italic; line-height: 1.5; max-width: 240px;
+}
+.footer-col h4 {
+  font-size: 0.72rem; letter-spacing: 0.1em;
+  color: var(--stone); text-transform: uppercase;
+  font-weight: 500; margin-bottom: 1.25rem;
+}
+.footer-col ul { list-style: none; }
+.footer-col ul li { margin-bottom: 0.6rem; }
+.footer-col ul li a {
+  font-size: 0.875rem; color: rgba(244,239,230,0.4);
+  transition: color var(--dur-micro);
+}
+.footer-col ul li a:hover { color: rgba(244,239,230,0.8); }
+.footer-bottom {
+  max-width: 1280px; margin: 3rem auto 0;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(244,239,230,0.06);
+  display: flex; justify-content: space-between;
+  align-items: center; flex-wrap: wrap; gap: 1rem;
+  position: relative; z-index: 1;
+}
+.footer-credit {
+  font-size: 0.75rem; color: rgba(163,155,141,0.4);
+}
+.footer-copy { font-size: 0.75rem; color: rgba(163,155,141,0.3); }
+
+/* ═══════════════════════════════════════════════════
+   TRAIL LINE
+═══════════════════════════════════════════════════ */
+#trail-line {
+  position: fixed; left: 1.5rem; top: 50%;
+  transform: translateY(-50%);
+  z-index: 100; pointer-events: none;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 0;
+}
+.trail-svg { width: 2px; height: 60vh; overflow: visible; }
+.trail-path {
+  stroke: var(--marigold); stroke-width: 1;
+  stroke-dasharray: 3 5;
+  opacity: 0.4;
+  fill: none;
+}
+
+/* ═══════════════════════════════════════════════════
+   REVEAL / ANIMATION UTILITIES
+═══════════════════════════════════════════════════ */
+.reveal {
+  opacity: 0; transform: translateY(24px);
+  transition: opacity var(--dur-reveal) var(--ease-out),
+              transform var(--dur-reveal) var(--ease-out);
+}
+.reveal.visible { opacity: 1; transform: none; }
+.reveal-delay-1 { transition-delay: 80ms; }
+.reveal-delay-2 { transition-delay: 160ms; }
+.reveal-delay-3 { transition-delay: 240ms; }
+.reveal-delay-4 { transition-delay: 320ms; }
+
+/* ═══════════════════════════════════════════════════
+   RESPONSIVE
+═══════════════════════════════════════════════════ */
+@media (max-width: 1024px) {
+  .how-inner, .engine-inner, .map-inner { grid-template-columns: 1fr; }
+  .how-right { position: static; }
+  .dest-grid { grid-template-columns: 1fr 1fr; }
+  .dest-card:first-child { grid-row: auto; }
+  .dest-card:first-child .dest-card-img-wrap { min-height: 280px; }
+  .stats-inner { grid-template-columns: repeat(2,1fr); gap: 3rem; }
+  .footer-inner { grid-template-columns: 1fr 1fr; }
+  .tickets-row { grid-template-columns: 1fr 1fr; }
+  #trail-line { display: none; }
+}
+
+@media (max-width: 768px) {
+  .nav-links, .nav-actions { display: none; }
+  #hamburger { display: flex; }
+  .dest-grid { grid-template-columns: 1fr; }
+  .dest-card:not(:first-child) .dest-card-img-wrap { height: 240px; }
+  .tickets-row { grid-template-columns: 1fr; }
+  .stats-inner { grid-template-columns: repeat(2,1fr); }
+  .footer-inner { grid-template-columns: 1fr; gap: 2rem; }
+  .qs-field:nth-child(3) { display: none; }
+  #quick-search { flex-wrap: wrap; }
+  .qs-cta { width: 100%; justify-content: center; padding: 1rem; }
+  .section-header { flex-direction: column; align-items: flex-start; gap: 1rem; }
+}
+
+@media (max-width: 480px) {
+  .stats-inner { grid-template-columns: 1fr 1fr; gap: 2rem; }
+  .cta-btns { flex-direction: column; align-items: center; }
+  .hero-caption { display: none; }
+  .season-widget { display: none; }
+}
+
+/* prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+  #intro { display: none; }
+  #nav-logo { visibility: visible; }
+}
+</style>
+</head>
+<body class="intro-active">
+
+<a href="#main" class="skip-link">Skip to content</a>
+<div id="scroll-progress" aria-hidden="true"></div>
+
+<!-- ═══════════════════════════════════════════════
+     INTRO OVERLAY
+═══════════════════════════════════════════════ -->
+<div id="intro" aria-hidden="true" role="presentation">
+  <div id="intro-logo-wrap">
+    <!-- Logo placeholder — swap src to /logo.svg or your public path -->
+    <img id="intro-logo-img" src="" alt="" aria-hidden="true"
+      onerror="this.style.display='none'; document.getElementById('intro-logo-text').style.display='block'">
+    <!-- Text fallback if logo.svg is not yet linked -->
+    <div id="intro-logo-text" style="
+      font-family:'Cormorant Garamond',Georgia,serif;
+      font-size:2.8rem; font-weight:300; font-style:italic;
+      color:#F4EFE6; letter-spacing:0.04em; text-align:center;">
+      YatraPath
+    </div>
+  </div>
+  <div id="intro-skip">click or press any key to skip</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     NAVBAR
+═══════════════════════════════════════════════ -->
+<header id="navbar" role="banner">
+  <div class="nav-inner">
+    <a href="/" id="nav-logo" aria-label="YatraPath home">
+      <!-- Swap src to /logo.svg -->
+      <img src="" alt="YatraPath"
+        onerror="this.outerHTML='<span style=\'font-family:var(--font-display);font-size:1.3rem;font-weight:400;font-style:italic;color:var(--snow)\'>YatraPath</span>'">
+    </a>
+    <nav class="nav-links" aria-label="Main navigation">
+      <a href="#destinations">Destinations</a>
+      <a href="#how">How it works</a>
+      <a href="#trending">Itineraries</a>
+      <a href="#stories">Reviews</a>
+    </nav>
+    <div class="nav-actions">
+      <a href="/login" class="nav-login">Log in</a>
+      <a href="/register" class="btn-primary">Get Started</a>
+    </div>
+    <button id="hamburger" aria-label="Open menu" aria-expanded="false"
+      aria-controls="mobile-menu">
+      <span></span><span></span><span></span>
+    </button>
+  </div>
+</header>
+
+<!-- Mobile menu -->
+<nav id="mobile-menu" aria-label="Mobile navigation" aria-hidden="true">
+  <button id="menu-close" aria-label="Close menu">✕</button>
+  <a href="#destinations" class="mobile-link">Destinations</a>
+  <a href="#how" class="mobile-link">How it works</a>
+  <a href="#trending" class="mobile-link">Itineraries</a>
+  <a href="#stories" class="mobile-link">Reviews</a>
+  <a href="/login" class="mobile-link">Log in</a>
+</nav>
+
+<!-- ═══════════════════════════════════════════════
+     MAIN
+═══════════════════════════════════════════════ -->
+<main id="main">
+
+<!-- HERO -->
+<section id="hero" aria-label="Hero">
+
+  <!-- Hero slideshow -->
+  <div class="hero-slides" aria-hidden="true">
+    <div class="hero-slide active" id="slide-0" style="background-color:#1a2a38;background-image:linear-gradient(135deg,#0F1A22 0%,#1E3A34 50%,#2B3A45 100%)"></div>
+    <div class="hero-slide"       id="slide-1" style="background-color:#1e2d38;background-image:linear-gradient(135deg,#1E3A34 0%,#2B3A45 60%,#1a3028 100%)"></div>
+    <div class="hero-slide"       id="slide-2" style="background-color:#1a2830;background-image:linear-gradient(135deg,#2B3A45 0%,#1E3A34 50%,#0F1A22 100%)"></div>
+    <div class="hero-slide"       id="slide-3" style="background-color:#20302a;background-image:linear-gradient(135deg,#1E3A34 0%,#0F1A22 40%,#2B3A45 100%)"></div>
+  </div>
+
+  <!-- Atmosphere layers -->
+  <div class="hero-overlay" aria-hidden="true"></div>
+  <div class="hero-overlay-bottom" aria-hidden="true"></div>
+  <div class="mist" aria-hidden="true">
+    <div class="mist-band"></div>
+    <div class="mist-band"></div>
+  </div>
+
+  <!-- Prayer flags SVG -->
+  <div class="flags-wrap" aria-hidden="true">
+    <svg viewBox="0 0 260 60" xmlns="http://www.w3.org/2000/svg" width="260">
+      <line x1="0" y1="8" x2="260" y2="18" stroke="rgba(200,151,58,0.3)" stroke-width="0.5"/>
+      <rect x="10" y="8" width="22" height="30" fill="rgba(180,83,58,0.45)" rx="1"/>
+      <rect x="44" y="10" width="22" height="30" fill="rgba(200,151,58,0.45)" rx="1"/>
+      <rect x="78" y="11" width="22" height="30" fill="rgba(244,239,230,0.25)" rx="1"/>
+      <rect x="112" y="12" width="22" height="30" fill="rgba(143,165,138,0.45)" rx="1"/>
+      <rect x="146" y="13" width="22" height="30" fill="rgba(30,58,52,0.55)" rx="1"/>
+      <rect x="180" y="14" width="22" height="30" fill="rgba(180,83,58,0.4)" rx="1"/>
+      <rect x="214" y="15" width="22" height="30" fill="rgba(200,151,58,0.4)" rx="1"/>
+    </svg>
+  </div>
+
+  <!-- Season widget -->
+  <div class="season-widget">
+    <div class="season-widget-inner">
+      <div class="season-time" id="ktm-time">--:--</div>
+      <div class="season-name" id="season-name">Autumn</div>
+      <div class="season-tip" id="season-tip">Best season for trekking</div>
+    </div>
+  </div>
+
+  <!-- Hero content -->
+  <div class="hero-content">
+    <p class="hero-eyebrow" id="hero-eyebrow" aria-hidden="true">
+      यात्रा पथ · Nepal, planned for you
+    </p>
+
+    <h1 class="hero-h1">
+      <span class="hero-h1-inner" id="hero-h1">
+        Let the path<br><em>find</em> you.
+      </span>
+    </h1>
+
+    <div class="hero-ticker" id="hero-ticker">
+      <span class="ticker-label">Explore</span>
+      <div class="ticker-slot" aria-live="off" aria-atomic="true">
+        <div class="ticker-word current" id="tick-0">Annapurna dawns</div>
+        <div class="ticker-word next"    id="tick-1">Kathmandu alleys</div>
+        <div class="ticker-word next"    id="tick-2">Chitwan mornings</div>
+        <div class="ticker-word next"    id="tick-3">Phewa Lake evenings</div>
+      </div>
+      <span class="sr-only">Annapurna dawns, Kathmandu alleys, Chitwan mornings, Phewa Lake evenings</span>
+    </div>
+
+    <p class="hero-sub" id="hero-sub">
+      Tell us where, how long and how much. YatraPath builds a personal morning-to-evening plan across Nepal in under three seconds.
+    </p>
+
+    <!-- Quick search -->
+    <div id="quick-search" role="search" aria-label="Plan your trip">
+      <div class="qs-field">
+        <label class="qs-label" for="qs-dest">Destination</label>
+        <input class="qs-input" id="qs-dest" type="text"
+          placeholder="Pokhara, Chitwan…" autocomplete="off">
+      </div>
+      <div class="qs-field" style="max-width:130px">
+        <label class="qs-label">Days</label>
+        <div class="qs-stepper">
+          <button id="days-minus" aria-label="Decrease days">−</button>
+          <span class="qs-days-val" id="days-val">5</span>
+          <button id="days-plus" aria-label="Increase days">+</button>
+        </div>
+      </div>
+      <div class="qs-field">
+        <label class="qs-label" for="qs-budget">Budget (NPR)</label>
+        <input class="qs-input" id="qs-budget" type="number"
+          placeholder="25,000" min="1000" step="1000">
+        <div class="qs-meta">
+          <span class="qs-per-day" id="qs-perday"></span>
+          <span class="qs-tier" id="qs-tier"></span>
+        </div>
+      </div>
+      <button class="qs-cta" id="qs-submit" aria-label="Generate itinerary">
+        Generate
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </div><!-- /hero-content -->
+
+  <!-- Hero photo caption -->
+  <div class="hero-caption" aria-hidden="true">
+    <div class="hero-caption-text" id="hero-caption-text">Annapurna · Gandaki · 28.5937° N</div>
+    <div class="hero-progress">
+      <div class="hero-progress-bar" id="hero-progress-bar"></div>
+    </div>
+  </div>
+
+  <!-- Scroll cue -->
+  <div class="scroll-cue" id="scroll-cue" aria-hidden="true">
+    <div class="scroll-cue-line"></div>
+    <span>Scroll</span>
+  </div>
+
+  <!-- Ridgeline SVG curve at bottom -->
+  <div class="hero-curve" aria-hidden="true">
+    <svg viewBox="0 0 1440 80" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M0,80 L0,55 C80,30 120,20 200,35 C280,50 340,25 440,18 C540,11 580,28 660,32 C740,36 800,20 900,15 C1000,10 1060,28 1160,38 C1260,48 1340,30 1440,20 L1440,80 Z"
+        fill="#F4EFE6"/>
+    </svg>
+  </div>
+
+  <!-- Trust strip -->
+  <div class="trust-strip" role="list">
+    <div class="trust-item" role="listitem"><span class="trust-dot"></span>Season-aware</div>
+    <div class="trust-item" role="listitem"><span class="trust-dot"></span>Budget-smart</div>
+    <div class="trust-item" role="listitem"><span class="trust-dot"></span>Route-optimised</div>
+    <div class="trust-item" role="listitem"><span class="trust-dot"></span>PDF ready</div>
+  </div>
+
+</section><!-- /hero -->
+
+
+<!-- MARQUEE -->
+<section id="marquee" aria-hidden="true">
+  <div class="marquee-track">
+    <!-- Doubled for seamless loop -->
+    <span class="marquee-item">Kathmandu <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Pokhara <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Chitwan <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Lumbini <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Bhaktapur <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Nagarkot <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Mustang <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Langtang <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Ilam <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Boudhanath <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Kathmandu <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Pokhara <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Chitwan <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Lumbini <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Bhaktapur <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Nagarkot <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Mustang <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Langtang <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Ilam <span class="marquee-glyph">✦</span></span>
+    <span class="marquee-item">Boudhanath <span class="marquee-glyph">✦</span></span>
+  </div>
+</section>
+
+
+<!-- HOW IT WORKS -->
+<section id="how" aria-labelledby="how-h2">
+  <div class="topo-bg" aria-hidden="true"></div>
+  <div class="how-inner">
+    <div class="how-left">
+      <p class="section-eyebrow reveal">Three steps, one path</p>
+      <h2 class="section-h2 reveal reveal-delay-1" id="how-h2">
+        Your Nepal plan,<br><em>built in seconds</em>
+      </h2>
+      <div class="how-steps">
+        <div class="how-path-line" aria-hidden="true"></div>
+        <div class="how-step reveal">
+          <div class="how-step-num" aria-hidden="true">01</div>
+          <div class="how-step-body">
+            <h3>Set your preferences</h3>
+            <p>Pick destinations, travel dates, how long you have, your budget in NPR and what you love doing.</p>
+          </div>
+        </div>
+        <div class="how-step reveal reveal-delay-1">
+          <div class="how-step-num" aria-hidden="true">02</div>
+          <div class="how-step-body">
+            <h3>Generate the plan</h3>
+            <p>Our engine detects the season, filters unsuitable routes, scores your interests, respects your budget and orders the journey by the Haversine distance.</p>
+          </div>
+        </div>
+        <div class="how-step reveal reveal-delay-2">
+          <div class="how-step-num" aria-hidden="true">03</div>
+          <div class="how-step-body">
+            <h3>Travel</h3>
+            <p>Save the itinerary, share it with your group or download a clean PDF. Then go.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="how-right reveal reveal-delay-2">
+      <div class="how-panel">
+        <div class="how-panel-inner">
+          <div style="font-size:0.7rem;color:var(--stone);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:1rem">Day 2 · Pokhara</div>
+          <div class="mock-card">
+            <div class="mock-card-row">
+              <span class="mock-time">Morning</span>
+              <span class="mock-act">Sarangkot sunrise viewpoint</span>
+              <span class="mock-cost">NPR 0</span>
+            </div>
+            <div class="mock-card-row">
+              <span class="mock-time">Afternoon</span>
+              <span class="mock-act">Phewa Lake boating & Tal Barahi</span>
+              <span class="mock-cost">NPR 500</span>
+            </div>
+            <div class="mock-card-row">
+              <span class="mock-time">Evening</span>
+              <span class="mock-act">Lakeside market & dinner</span>
+              <span class="mock-cost">NPR 800</span>
+            </div>
+          </div>
+          <div style="margin-top:1rem;display:flex;gap:0.75rem;align-items:center">
+            <div style="flex:1;height:4px;background:rgba(163,155,141,0.15);border-radius:4px;overflow:hidden">
+              <div style="width:42%;height:100%;background:var(--marigold);border-radius:4px"></div>
+            </div>
+            <span style="font-size:0.72rem;color:var(--stone)">NPR 1,300 / 3,800</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ENGINE DEMO -->
+<section id="engine" aria-labelledby="engine-h2">
+  <div class="engine-bg-blur" aria-hidden="true"></div>
+  <div class="engine-inner">
+    <div class="engine-controls">
+      <p class="section-eyebrow reveal">Why the plan feels human</p>
+      <h2 class="section-h2 reveal reveal-delay-1" id="engine-h2">
+        Watch the<br><em>algorithm work</em>
+      </h2>
+      <p style="font-size:0.9rem;color:var(--stone);line-height:1.7;margin-bottom:2rem" class="reveal reveal-delay-2">
+        Adjust the controls. The itinerary rebuilds in real time — the same way it does for your actual trip.
+      </p>
+
+      <div class="engine-control-group reveal">
+        <div class="engine-label">Season</div>
+        <div class="season-tabs" role="group" aria-label="Select season">
+          <button class="season-tab active" data-season="spring">Spring</button>
+          <button class="season-tab" data-season="monsoon">Monsoon</button>
+          <button class="season-tab active-default" data-season="autumn">Autumn</button>
+          <button class="season-tab" data-season="winter">Winter</button>
+        </div>
+      </div>
+
+      <div class="engine-control-group reveal reveal-delay-1">
+        <div class="engine-label">Budget — <span id="budget-display-label">NPR 35,000</span></div>
+        <div class="budget-slider-wrap">
+          <input type="range" id="budget-slider" min="8000" max="100000" step="1000" value="35000"
+            aria-label="Budget in NPR">
+        </div>
+        <div class="budget-display">
+          <span class="budget-val" id="budget-val">NPR 35,000</span>
+          <span class="budget-tier-chip" id="budget-tier">Mid-range</span>
+        </div>
+      </div>
+
+      <div class="engine-control-group reveal reveal-delay-2">
+        <div class="engine-label">Interests</div>
+        <div class="interest-chips" role="group" aria-label="Select interests">
+          <button class="interest-chip selected" data-int="adventure">Adventure</button>
+          <button class="interest-chip selected" data-int="cultural">Cultural</button>
+          <button class="interest-chip" data-int="nature">Nature</button>
+          <button class="interest-chip" data-int="food">Food</button>
+          <button class="interest-chip" data-int="wellness">Wellness</button>
+          <button class="interest-chip" data-int="photo">Photography</button>
+        </div>
+      </div>
+
+      <!-- Algorithm stepper -->
+      <div class="algo-stepper reveal reveal-delay-3">
+        <div class="algo-step" id="algo-0"><div class="algo-step-dot"></div>Season detection</div>
+        <div class="algo-step" id="algo-1"><div class="algo-step-dot"></div>Season filter</div>
+        <div class="algo-step" id="algo-2"><div class="algo-step-dot"></div>Interest scoring</div>
+        <div class="algo-step" id="algo-3"><div class="algo-step-dot"></div>Budget allocation</div>
+        <div class="algo-step" id="algo-4"><div class="algo-step-dot"></div>Route optimisation</div>
+        <div class="algo-step" id="algo-5"><div class="algo-step-dot"></div>Time-slot filling</div>
+        <div class="algo-status" id="algo-status"></div>
+      </div>
+    </div>
+
+    <!-- Result card -->
+    <div class="engine-result reveal reveal-delay-1">
+      <div class="day-card" id="demo-card">
+        <div class="day-card-header">
+          <span class="day-card-title" id="demo-title">Day 1 · Kathmandu</span>
+          <span class="day-card-budget" id="demo-budget">Budget: NPR 35,000 · 5 days</span>
+        </div>
+        <div class="day-slots" id="demo-slots">
+          <div class="day-slot">
+            <span class="slot-time">Morning</span>
+            <div>
+              <div class="slot-name" id="slot-0-name">Boudhanath Stupa</div>
+              <div class="slot-desc" id="slot-0-desc">Circle the world's largest stupa at dawn, prayer wheels still warm.</div>
+            </div>
+            <span class="slot-cost" id="slot-0-cost">NPR 200</span>
+          </div>
+          <div class="day-slot">
+            <span class="slot-time">Afternoon</span>
+            <div>
+              <div class="slot-name" id="slot-1-name">Pashupatinath Temple</div>
+              <div class="slot-desc" id="slot-1-desc">Nepal's holiest Hindu temple; arrive before the aarti ceremony.</div>
+            </div>
+            <span class="slot-cost" id="slot-1-cost">NPR 1,000</span>
+          </div>
+          <div class="day-slot">
+            <span class="slot-time">Evening</span>
+            <div>
+              <div class="slot-name" id="slot-2-name">Thamel Night Walk</div>
+              <div class="slot-desc" id="slot-2-desc">Wander the bazaar, try momos and butter tea at a local stall.</div>
+            </div>
+            <span class="slot-cost" id="slot-2-cost">NPR 600</span>
+          </div>
+        </div>
+        <div class="budget-bar-wrap">
+          <div class="budget-bar-label">
+            <span>Day spend</span>
+            <span id="demo-spend-label">NPR 1,800 / 7,000</span>
+          </div>
+          <div class="budget-bar">
+            <div class="budget-bar-fill" id="demo-bar" style="width:26%"></div>
+          </div>
+        </div>
+      </div>
+      <div class="engine-caption" id="engine-caption">
+        Autumn detected — clear skies, ideal for trekking and temple visits.
+      </div>
+      <div style="margin-top:1.5rem">
+        <a href="/register" class="btn-primary" style="display:inline-flex;text-decoration:none">
+          Try it with your own trip
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style="margin-left:4px">
+            <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- FEATURED DESTINATIONS -->
+<section id="destinations" aria-labelledby="dest-h2">
+  <div class="destinations-inner">
+    <div class="section-header">
+      <div>
+        <p class="section-eyebrow reveal">Top-rated by travellers</p>
+        <h2 class="section-h2 reveal reveal-delay-1" id="dest-h2">Featured<br><em>destinations</em></h2>
+      </div>
+      <a href="/destinations" class="view-all reveal reveal-delay-2">Explore all</a>
+    </div>
+
+    <div class="dest-grid" id="dest-grid">
+      <!-- Cards injected by JS -->
+    </div>
+  </div>
+</section>
+
+
+<!-- MAP TEASER -->
+<section id="map-teaser" aria-labelledby="map-h2">
+  <div class="map-inner">
+    <div class="map-copy">
+      <p class="section-eyebrow reveal">Haversine route optimisation</p>
+      <h2 class="section-h2 reveal reveal-delay-1" id="map-h2">
+        Routes ordered so you<br><em>explore</em>, not commute
+      </h2>
+      <p class="map-sub reveal reveal-delay-2">
+        YatraPath connects destinations in the nearest-neighbour order that minimises travel time, so each day starts where the last one ended.
+      </p>
+      <div class="map-chips reveal reveal-delay-3">
+        <div class="map-chip"><span class="map-chip-dot"></span>Kathmandu → Pokhara → Chitwan</div>
+        <div class="map-chip"><span class="map-chip-dot"></span>~480 km · 7 days</div>
+        <div class="map-chip"><span class="map-chip-dot"></span>Est. NPR 42,000</div>
+      </div>
+    </div>
+    <div class="map-visual reveal reveal-delay-1">
+      <!-- Schematic Nepal map with animated route -->
+      <svg id="nepal-svg" viewBox="0 0 560 200" xmlns="http://www.w3.org/2000/svg"
+        style="width:100%;height:100%;padding:1.5rem" aria-label="Map of Nepal showing sample route">
+        <!-- Nepal rough outline -->
+        <path d="M30,120 C60,90 90,70 130,60 C170,50 210,55 260,50 C310,45 360,35 410,40 C450,44 490,55 530,70 L530,140 C490,145 450,140 410,138 C370,136 340,145 300,148 C260,151 220,145 180,148 C140,151 100,150 70,145 Z"
+          fill="none" stroke="rgba(244,239,230,0.12)" stroke-width="1.5"/>
+        <!-- Route line (animated) -->
+        <path id="route-path"
+          d="M140,90 C160,85 180,80 200,78 C240,88 270,82 310,80 C340,85 370,95 400,100"
+          fill="none" stroke="var(--marigold)" stroke-width="1.5"
+          stroke-dasharray="200" stroke-dashoffset="200"
+          stroke-linecap="round"/>
+        <!-- City pins -->
+        <g id="pin-ktm">
+          <circle cx="140" cy="90" r="5" fill="var(--marigold)" opacity="0"/>
+          <circle cx="140" cy="90" r="12" fill="none" stroke="rgba(200,151,58,0.3)" stroke-width="1" opacity="0"/>
+          <text x="140" y="78" text-anchor="middle" fill="rgba(244,239,230,0.7)" font-size="9" font-family="Inter,sans-serif">Kathmandu</text>
+        </g>
+        <g id="pin-pkr">
+          <circle cx="270" cy="82" r="5" fill="var(--marigold)" opacity="0"/>
+          <circle cx="270" cy="82" r="12" fill="none" stroke="rgba(200,151,58,0.3)" stroke-width="1" opacity="0"/>
+          <text x="270" y="70" text-anchor="middle" fill="rgba(244,239,230,0.7)" font-size="9" font-family="Inter,sans-serif">Pokhara</text>
+        </g>
+        <g id="pin-cht">
+          <circle cx="400" cy="100" r="5" fill="var(--marigold)" opacity="0"/>
+          <circle cx="400" cy="100" r="12" fill="none" stroke="rgba(200,151,58,0.3)" stroke-width="1" opacity="0"/>
+          <text x="400" y="88" text-anchor="middle" fill="rgba(244,239,230,0.7)" font-size="9" font-family="Inter,sans-serif">Chitwan</text>
+        </g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+
+<!-- INTERESTS CAROUSEL -->
+<section id="interests" aria-labelledby="interests-h2">
+  <div class="interests-header">
+    <div>
+      <p class="section-eyebrow reveal">Choose your vibe</p>
+      <h2 class="section-h2 reveal reveal-delay-1" id="interests-h2">
+        What draws<br><em>you to Nepal?</em>
+      </h2>
+    </div>
+  </div>
+  <div class="interest-tiles" role="list" id="interest-tiles">
+    <!-- Tiles injected by JS -->
+  </div>
+  <div class="interests-cta" style="margin-top:2rem">
+    <button class="btn-primary" id="interests-cta-btn" style="opacity:0.4;cursor:default" disabled>
+      Start with these interests
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <path d="M2 7h10M8 3l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>
+  </div>
+</section>
+
+
+<!-- TRENDING ITINERARIES -->
+<section id="trending" aria-labelledby="trending-h2">
+  <div class="trending-inner">
+    <div class="section-header">
+      <div>
+        <p class="section-eyebrow reveal">Most saved this month</p>
+        <h2 class="section-h2 reveal reveal-delay-1" id="trending-h2">
+          Trending<br><em>itineraries</em>
+        </h2>
+      </div>
+    </div>
+    <div class="tickets-row" id="tickets-row">
+      <!-- Injected by JS -->
+    </div>
+  </div>
+</section>
+
+
+<!-- STATS -->
+<section id="stats" aria-labelledby="stats-h2">
+  <div class="stats-inner">
+    <div class="stat-item reveal">
+      <div class="stat-num" id="stat-dest">0</div>
+      <div class="stat-label">Destinations</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-1">
+      <div class="stat-num" id="stat-act">0</div>
+      <div class="stat-label">Activities mapped</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-2">
+      <div class="stat-num" id="stat-plans">0</div>
+      <div class="stat-label">Itineraries generated</div>
+    </div>
+    <div class="stat-item reveal reveal-delay-3">
+      <div class="stat-num" id="stat-reviews">0</div>
+      <div class="stat-label">Traveller reviews</div>
+    </div>
+  </div>
+  <h2 class="sr-only" id="stats-h2">YatraPath by the numbers</h2>
+</section>
+
+
+<!-- STORIES -->
+<section id="stories" aria-labelledby="stories-h2">
+  <div class="stories-watermark" aria-hidden="true">यात्रा</div>
+  <div class="stories-inner">
+    <p class="section-eyebrow reveal">Traveller stories</p>
+    <h2 class="section-h2 reveal reveal-delay-1" id="stories-h2">
+      From the<br><em>people who went</em>
+    </h2>
+    <div class="quote-slider reveal reveal-delay-2" id="quote-slider">
+      <!-- Injected by JS -->
+    </div>
+    <div class="quote-nav" id="quote-nav" aria-label="Reviews pagination"></div>
+  </div>
+</section>
+
+
+<!-- FINAL CTA -->
+<section id="final-cta" aria-labelledby="cta-h2">
+  <div class="cta-ridges" aria-hidden="true">
+    <svg viewBox="0 0 1440 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;display:block">
+      <path d="M0,200 L0,140 C100,100 160,120 250,110 C340,100 400,80 520,75 C640,70 700,95 820,90 C940,85 1020,60 1140,65 C1260,70 1360,100 1440,95 L1440,200 Z"
+        fill="rgba(15,26,34,0.25)"/>
+      <path d="M0,200 L0,160 C120,130 200,150 320,145 C440,140 500,115 640,108 C780,101 860,125 980,122 C1100,119 1200,100 1320,105 C1380,108 1420,120 1440,118 L1440,200 Z"
+        fill="rgba(15,26,34,0.18)"/>
+    </svg>
+  </div>
+  <div class="cta-inner">
+    <p class="section-eyebrow reveal" style="justify-content:center;color:rgba(163,155,141,0.5)">Ready when you are</p>
+    <h2 class="cta-h2 reveal reveal-delay-1" id="cta-h2">
+      Your Nepal is<br>one plan <em>away.</em>
+    </h2>
+    <p class="cta-sub reveal reveal-delay-2">Free to start. No spreadsheets. No guesswork.</p>
+    <div class="cta-btns reveal reveal-delay-3">
+      <a href="/register" class="btn-primary" style="font-size:1rem;padding:0.9rem 2rem">
+        Get Started
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </a>
+      <a href="/destinations" class="btn-outline">Browse destinations</a>
+    </div>
+  </div>
+</section>
+
+
+<!-- FOOTER -->
+<footer id="footer" role="contentinfo">
+  <div class="footer-deva" aria-hidden="true">यात्रा पथ</div>
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <a href="/" aria-label="YatraPath home">
+        <img src="" alt="YatraPath"
+          onerror="this.outerHTML='<span style=\'font-family:var(--font-display);font-size:1.4rem;font-weight:300;font-style:italic;color:rgba(244,239,230,0.6)\'>YatraPath</span>'">
+      </a>
+      <p class="footer-slogan">"Let the path find you."</p>
+    </div>
+    <div class="footer-col">
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="/destinations">All destinations</a></li>
+        <li><a href="#trending">Trending itineraries</a></li>
+        <li><a href="#interests">Travel styles</a></li>
+        <li><a href="#how">How it works</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Account</h4>
+      <ul>
+        <li><a href="/register">Sign up free</a></li>
+        <li><a href="/login">Log in</a></li>
+        <li><a href="/dashboard">My itineraries</a></li>
+      </ul>
+    </div>
+    <div class="footer-col">
+      <h4>Project</h4>
+      <ul>
+        <li><a href="#">About YatraPath</a></li>
+        <li><a href="#">Algorithm</a></li>
+        <li><a href="#">Privacy</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p class="footer-credit">Developed as a 6th Semester BCA Project · Tribhuvan University</p>
+    <p class="footer-copy">© 2025 YatraPath. All rights reserved.</p>
+  </div>
+</footer>
+
+</main><!-- /main -->
+
+<!-- sr-only utility -->
+<style>.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}</style>
+
+<!-- ═══════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ── Reduced motion ── */
+const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+/* ── Scroll progress bar ── */
+const progressBar = document.getElementById('scroll-progress');
+function updateProgress() {
+  const max = document.documentElement.scrollHeight - window.innerHeight;
+  progressBar.style.transform = `scaleX(${max > 0 ? window.scrollY / max : 0})`;
+}
+window.addEventListener('scroll', updateProgress, { passive: true });
+
+/* ─────────────────────────────────────────────
+   INTRO OVERLAY
+───────────────────────────────────────────── */
+(function initIntro() {
+  const intro     = document.getElementById('intro');
+  const logoWrap  = document.getElementById('intro-logo-wrap');
+  const navLogo   = document.getElementById('nav-logo');
+
+  if (!intro) return;
+
+  // Skip if seen this session
+  if (sessionStorage.getItem('yp_intro_seen') || prefersReduced.matches) {
+    intro.style.display = 'none';
+    navLogo.style.visibility = 'visible';
+    document.body.classList.remove('intro-active');
+    triggerHeroEnter();
+    return;
+  }
+
+  // Constants (ms)
+  const BEAT_HOLD      = 150;
+  const REVEAL_START   = 100;
+  const HOLD_END       = 900;
+  const TRAVEL_START   = 900;
+  const TRAVEL_END     = 1550;
+  const BACKDROP_START = 950;
+  const BACKDROP_END   = 1500;
+  const STAGGER_START  = 1200;
+  const TOTAL          = 1800;
+
+  let skipped = false;
+
+  function skipIntro() {
+    if (skipped) return;
+    skipped = true;
+    intro.style.transition = 'opacity 0.25s';
+    intro.style.opacity = '0';
+    setTimeout(finishIntro, 260);
+  }
+
+  function finishIntro() {
+    intro.remove();
+    navLogo.style.visibility = 'visible';
+    document.body.classList.remove('intro-active');
+    sessionStorage.setItem('yp_intro_seen', '1');
+    triggerHeroEnter();
+  }
+
+  intro.addEventListener('click', skipIntro);
+  document.addEventListener('keydown', skipIntro, { once: true });
+
+  // Phase 1: logo reveal
+  logoWrap.style.opacity    = '0';
+  logoWrap.style.transform  = 'scale(0.92)';
+  logoWrap.style.filter     = 'blur(6px)';
+  logoWrap.style.willChange = 'transform, opacity, filter';
+
+  setTimeout(() => {
+    logoWrap.style.transition = `opacity 550ms cubic-bezier(0.22,1,0.36,1),
+                                  transform 550ms cubic-bezier(0.22,1,0.36,1),
+                                  filter 550ms cubic-bezier(0.22,1,0.36,1)`;
+    logoWrap.style.opacity    = '1';
+    logoWrap.style.transform  = 'scale(1)';
+    logoWrap.style.filter     = 'blur(0px)';
+  }, REVEAL_START);
+
+  // Phase 2: logo travels to navbar
+  setTimeout(() => {
+    if (skipped) return;
+
+    const introRect = logoWrap.getBoundingClientRect();
+    const navLogoEl = navLogo.querySelector('img, span');
+    navLogo.style.visibility = 'hidden'; // keep space but hidden
+    const navRect   = navLogo.getBoundingClientRect();
+
+    if (!navRect.width) { finishIntro(); return; }
+
+    const scaleTarget = navRect.width / introRect.width;
+    const tx = navRect.left + navRect.width / 2 - (introRect.left + introRect.width / 2);
+    const ty = navRect.top  + navRect.height / 2 - (introRect.top  + introRect.height / 2);
+
+    logoWrap.style.transition = `transform 650ms cubic-bezier(0.76,0,0.24,1),
+                                  filter 650ms cubic-bezier(0.76,0,0.24,1)`;
+    logoWrap.style.transform  = `translate(${tx}px, ${ty}px) scale(${scaleTarget})`;
+    logoWrap.style.filter     = 'blur(1.5px)';
+
+    // Backdrop fade
+    setTimeout(() => {
+      intro.style.transition = 'opacity 550ms cubic-bezier(0.22,1,0.36,1)';
+      intro.style.opacity    = '0';
+    }, BACKDROP_START - TRAVEL_START);
+
+  }, TRAVEL_START);
+
+  // Phase 3: clean up, show navbar logo
+  setTimeout(() => {
+    if (skipped) return;
+    logoWrap.style.filter     = 'blur(0px)';
+    logoWrap.style.willChange = 'auto';
+    navLogo.style.visibility  = 'visible';
+    finishIntro();
+  }, TOTAL);
+
+})();
+
+function triggerHeroEnter() {
+  const els = [
+    document.getElementById('hero-eyebrow'),
+    document.getElementById('hero-h1'),
+    document.getElementById('hero-ticker'),
+    document.getElementById('hero-sub'),
+    document.getElementById('quick-search'),
+    document.getElementById('scroll-cue'),
+  ];
+  els.forEach((el, i) => {
+    if (!el) return;
+    setTimeout(() => el && el.classList.add('visible'), i * 80);
+  });
+}
+
+/* ─────────────────────────────────────────────
+   HERO SLIDESHOW + TICKER
+───────────────────────────────────────────── */
+const slides = [
+  { slide:'slide-0', caption:'Annapurna · Gandaki · 28.5937° N',   tick:'Annapurna dawns'     },
+  { slide:'slide-1', caption:'Kathmandu · Bagmati · 27.7172° N',   tick:'Kathmandu alleys'    },
+  { slide:'slide-2', caption:'Chitwan · Narayani · 27.5291° N',    tick:'Chitwan mornings'    },
+  { slide:'slide-3', caption:'Phewa Lake · Gandaki · 28.2096° N',  tick:'Phewa Lake evenings' },
+];
+let currentSlide = 0;
+const SLIDE_DURATION = 4800;
+
+function nextSlide() {
+  const prev = currentSlide;
+  currentSlide = (currentSlide + 1) % slides.length;
+
+  // Slide transition
+  document.getElementById(slides[prev].slide).classList.remove('active');
+  document.getElementById(slides[prev].slide).classList.add('exiting');
+  setTimeout(() => document.getElementById(slides[prev].slide).classList.remove('exiting'), 1400);
+  document.getElementById(slides[currentSlide].slide).classList.add('active');
+
+  // Caption
+  const cap = document.getElementById('hero-caption-text');
+  if (cap) cap.textContent = slides[currentSlide].caption;
+
+  // Ticker
+  const words = document.querySelectorAll('.ticker-word');
+  words.forEach(w => { w.className = 'ticker-word next'; });
+  if (words[currentSlide]) words[currentSlide].className = 'ticker-word current';
+
+  // Progress bar
+  resetProgress();
+}
+
+function resetProgress() {
+  const bar = document.getElementById('hero-progress-bar');
+  if (!bar) return;
+  bar.style.transition = 'none';
+  bar.style.transform = 'scaleX(0)';
+  setTimeout(() => {
+    bar.style.transition = `transform ${SLIDE_DURATION}ms linear`;
+    bar.style.transform  = 'scaleX(1)';
+  }, 30);
+}
+
+if (!prefersReduced.matches) {
+  resetProgress();
+  setInterval(nextSlide, SLIDE_DURATION);
+}
+
+/* ─────────────────────────────────────────────
+   SEASON WIDGET
+───────────────────────────────────────────── */
+function updateSeasonWidget() {
+  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kathmandu' }));
+  const h = now.getHours(), m = now.getMinutes();
+  const timeEl = document.getElementById('ktm-time');
+  if (timeEl) timeEl.textContent = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+
+  const month = now.getMonth() + 1;
+  let season, tip;
+  if (month >= 3 && month <= 5)       { season = 'Spring';  tip = 'Rhododendrons in bloom'; }
+  else if (month >= 6 && month <= 9)  { season = 'Monsoon'; tip = 'Lush green valleys'; }
+  else if (month >= 10 && month <= 11){ season = 'Autumn';  tip = 'Best for trekking'; }
+  else                                 { season = 'Winter';  tip = 'Clear mountain views'; }
+
+  const nameEl = document.getElementById('season-name');
+  const tipEl  = document.getElementById('season-tip');
+  if (nameEl) nameEl.textContent = season;
+  if (tipEl)  tipEl.textContent  = tip;
+}
+updateSeasonWidget();
+setInterval(updateSeasonWidget, 30000);
+
+/* ─────────────────────────────────────────────
+   NAVBAR BEHAVIOUR
+───────────────────────────────────────────── */
+const navbar = document.getElementById('navbar');
+let lastScroll = 0;
+window.addEventListener('scroll', () => {
+  const y = window.scrollY;
+  if (y > 40) navbar.classList.add('scrolled'); else navbar.classList.remove('scrolled');
+  if (y > lastScroll && y > 200) navbar.classList.add('hidden');
+  else navbar.classList.remove('hidden');
+  lastScroll = y;
+}, { passive: true });
+
+// Hamburger
+const ham = document.getElementById('hamburger');
+const mobileMenu = document.getElementById('mobile-menu');
+const menuClose  = document.getElementById('menu-close');
+
+function openMenu()  {
+  mobileMenu.classList.add('open');
+  mobileMenu.setAttribute('aria-hidden','false');
+  ham.setAttribute('aria-expanded','true');
+  document.body.style.overflow = 'hidden';
+}
+function closeMenu() {
+  mobileMenu.classList.remove('open');
+  mobileMenu.setAttribute('aria-hidden','true');
+  ham.setAttribute('aria-expanded','false');
+  document.body.style.overflow = '';
+}
+
+ham.addEventListener('click', openMenu);
+menuClose.addEventListener('click', closeMenu);
+mobileMenu.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMenu));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMenu(); });
+
+/* ─────────────────────────────────────────────
+   QUICK SEARCH
+───────────────────────────────────────────── */
+let qsDays = 5;
+const daysVal = document.getElementById('days-val');
+document.getElementById('days-minus').addEventListener('click', () => {
+  qsDays = Math.max(1, qsDays - 1);
+  daysVal.textContent = qsDays;
+  recalcBudget();
+});
+document.getElementById('days-plus').addEventListener('click', () => {
+  qsDays = Math.min(30, qsDays + 1);
+  daysVal.textContent = qsDays;
+  recalcBudget();
+});
+
+document.getElementById('qs-budget').addEventListener('input', recalcBudget);
+
+function getBudgetTier(perDay) {
+  if (perDay < 2000)  return { label: 'Budget',    bg: 'rgba(143,165,138,0.12)', color: '#8FA58A' };
+  if (perDay < 6000)  return { label: 'Mid-range', bg: 'rgba(200,151,58,0.12)',  color: 'var(--marigold)' };
+  if (perDay < 15000) return { label: 'Comfort',   bg: 'rgba(43,58,69,0.1)',     color: 'var(--slate)' };
+  return               { label: 'Luxury',   bg: 'rgba(180,83,58,0.1)',    color: 'var(--terracotta)' };
+}
+
+function recalcBudget() {
+  const total = parseInt(document.getElementById('qs-budget').value) || 0;
+  if (!total || !qsDays) { document.getElementById('qs-perday').textContent = ''; document.getElementById('qs-tier').textContent = ''; return; }
+  const perDay = Math.round(total / qsDays);
+  const tier   = getBudgetTier(perDay);
+  document.getElementById('qs-perday').textContent  = `NPR ${perDay.toLocaleString()}/day`;
+  const tierEl = document.getElementById('qs-tier');
+  tierEl.textContent = tier.label;
+  tierEl.style.background = tier.bg;
+  tierEl.style.color      = tier.color;
+}
+
+document.getElementById('qs-submit').addEventListener('click', () => {
+  const dest   = document.getElementById('qs-dest').value;
+  const budget = document.getElementById('qs-budget').value;
+  sessionStorage.setItem('yp_prefill', JSON.stringify({ destination: dest, days: qsDays, budget }));
+  window.location.href = '/login';
+});
+
+/* ─────────────────────────────────────────────
+   ENGINE DEMO
+───────────────────────────────────────────── */
+const demoData = {
+  spring:  {
+    adventure: {
+      title:'Day 1 · Kathmandu Valley',
+      slots:[
+        { name:'Shivapuri Nagarjun Forest Trek', desc:'Morning trail through rhododendron forest, panoramic Himalayan views.', cost:'NPR 500' },
+        { name:'Swayambhunath Stupa', desc:'The monkey temple at midday, city views and Buddhist shrines.', cost:'NPR 200' },
+        { name:'Garden of Dreams', desc:'Restored neo-classical garden, evening quiet.', cost:'NPR 400' },
+      ],
+      spend: 1100, total: 7000, pct: 16,
+      caption: 'Spring detected — rhododendron season, mild temperatures ideal for day hikes.',
+    },
+    cultural: {
+      title:'Day 1 · Kathmandu Heritage',
+      slots:[
+        { name:'Patan Durbar Square', desc:'Three-hour walk through the finest Newar architecture in Nepal.', cost:'NPR 1,000' },
+        { name:'Kumari Ghar', desc:'The living goddess courtyard; she may appear at midday.', cost:'NPR 200' },
+        { name:'Ason Bazaar', desc:'Old bazaar, local spices and the sound of bells.', cost:'NPR 0' },
+      ],
+      spend: 1200, total: 7000, pct: 17,
+      caption: 'Spring festival season — expect Bisket Jatra celebrations in the valley.',
+    },
+  },
+  monsoon: {
+    adventure: {
+      title:'Day 1 · Chitwan (Monsoon)',
+      slots:[
+        { name:'Chitwan Jungle Walk', desc:'Monsoon makes the forest dense and wildlife active; guided morning walk.', cost:'NPR 1,500' },
+        { name:'Dugout Canoe Safari', desc:'Drift silently down the Rapti River — crocodiles on the banks.', cost:'NPR 800' },
+        { name:'Cultural Show', desc:'Tharu stick dance at the lodge after dinner.', cost:'NPR 600' },
+      ],
+      spend: 2900, total: 7000, pct: 41,
+      caption: 'Monsoon detected — trekking routes filtered out. Jungle wildlife and cultural experiences prioritised.',
+    },
+    cultural: {
+      title:'Day 1 · Kathmandu (Monsoon)',
+      slots:[
+        { name:'Boudhanath Stupa', desc:'Misty morning at the stupa; the fog softens everything beautifully.', cost:'NPR 200' },
+        { name:'Himalayan Art Museum', desc:'Rain-perfect afternoon among ancient thangkas and bronzes.', cost:'NPR 500' },
+        { name:'Thamel Food Tour', desc:'Local guide through street kitchens — steam dumplings and butter tea.', cost:'NPR 1,200' },
+      ],
+      spend: 1900, total: 7000, pct: 27,
+      caption: 'Monsoon detected — outdoor treks replaced with cultural and indoor experiences.',
+    },
+  },
+  autumn:  {
+    adventure: {
+      title:'Day 1 · Kathmandu',
+      slots:[
+        { name:'Boudhanath Stupa', desc:'Circle the world\'s largest stupa at dawn, prayer wheels still warm.', cost:'NPR 200' },
+        { name:'Pashupatinath Temple', desc:'Nepal\'s holiest Hindu temple; arrive before the aarti ceremony.', cost:'NPR 1,000' },
+        { name:'Thamel Night Walk', desc:'Wander the bazaar, try momos and butter tea at a local stall.', cost:'NPR 600' },
+      ],
+      spend: 1800, total: 7000, pct: 26,
+      caption: 'Autumn detected — clear skies, ideal for trekking and temple visits.',
+    },
+    cultural: {
+      title:'Day 1 · Bhaktapur',
+      slots:[
+        { name:'Bhaktapur Durbar Square', desc:'Best-preserved medieval square in Nepal, fewer crowds in the morning.', cost:'NPR 1,500' },
+        { name:'Pottery Square', desc:'Watch potters at the wheel in Sukuldhoka, the potter\'s quarter.', cost:'NPR 0' },
+        { name:'Newari Dinner', desc:'Thakali set meal with local raksi in a traditional courtyard house.', cost:'NPR 900' },
+      ],
+      spend: 2400, total: 7000, pct: 34,
+      caption: 'Autumn — Dashain and Tihar festivals; cultural activities scored highest.',
+    },
+  },
+  winter:  {
+    adventure: {
+      title:'Day 1 · Pokhara (Winter)',
+      slots:[
+        { name:'Sarangkot Sunrise', desc:'Crystal-clear winter morning, Annapurna range razor-sharp on the horizon.', cost:'NPR 0' },
+        { name:'Paragliding', desc:'Winter thermals are calm and steady — perfect for first-timers.', cost:'NPR 4,500' },
+        { name:'Phewa Lake Boating', desc:'Peaceful afternoon row; the lake reflects a cold-season sky.', cost:'NPR 500' },
+      ],
+      spend: 5000, total: 7000, pct: 71,
+      caption: 'Winter — snow on high passes filtered out. Pokhara valley activities prioritised.',
+    },
+    cultural: {
+      title:'Day 1 · Lumbini (Winter)',
+      slots:[
+        { name:'Maya Devi Temple', desc:'Birthplace of the Buddha; quiet mornings in winter.', cost:'NPR 500' },
+        { name:'Monastery Walk', desc:'Visit the Korean and Chinese monasteries in the sacred garden.', cost:'NPR 0' },
+        { name:'Meditation at Sunset', desc:'Join the monks for evening prayers — winter light is extraordinary.', cost:'NPR 0' },
+      ],
+      spend: 500, total: 7000, pct: 7,
+      caption: 'Winter — Lumbini is warm and uncrowded; spiritual sites ranked first.',
+    },
+  },
+};
+
+let currentSeason   = 'autumn';
+let currentInterest = 'adventure';
+let algoTimer = null;
+
+function getDemoKey() {
+  const int = currentInterest === 'cultural' ? 'cultural' : 'adventure';
+  return demoData[currentSeason]?.[int] || demoData.autumn.adventure;
+}
+
+function updateDemo() {
+  clearTimeout(algoTimer);
+  const d = getDemoKey();
+
+  // Run algorithm stepper animation
+  const steps = document.querySelectorAll('.algo-step');
+  const statEl = document.getElementById('algo-status');
+  steps.forEach(s => s.classList.remove('active'));
+
+  const statusMessages = [
+    'Detecting travel season…',
+    'Filtering unsuitable routes…',
+    'Scoring interests: ' + currentInterest,
+    'Allocating daily budget…',
+    'Optimising route (Haversine)…',
+    'Filling time slots…'
+  ];
+
+  function runStep(i) {
+    if (i >= steps.length) {
+      if (statEl) statEl.textContent = '✓ Plan ready in 0.8 s';
+      applyDemoResult(d);
+      return;
+    }
+    steps[i].classList.add('active');
+    if (statEl) statEl.textContent = statusMessages[i];
+    algoTimer = setTimeout(() => runStep(i + 1), 140);
+  }
+  runStep(0);
+}
+
+function applyDemoResult(d) {
+  document.getElementById('demo-title').textContent  = d.title;
+  document.getElementById('demo-budget').textContent = `Budget: NPR ${
+    parseInt(document.getElementById('budget-slider').value).toLocaleString()} · ${qsDays} days`;
+
+  for (let i = 0; i < 3; i++) {
+    const slot = d.slots[i];
+    const nameEl = document.getElementById(`slot-${i}-name`);
+    const descEl = document.getElementById(`slot-${i}-desc`);
+    const costEl = document.getElementById(`slot-${i}-cost`);
+    if (!nameEl) continue;
+
+    nameEl.style.opacity = '0';
+    setTimeout(() => {
+      nameEl.textContent = slot.name;
+      if (descEl) descEl.textContent = slot.desc;
+      if (costEl) costEl.textContent = slot.cost;
+      nameEl.style.transition = 'opacity 0.4s';
+      nameEl.style.opacity    = '1';
+    }, 50 + i * 80);
+  }
+
+  document.getElementById('demo-bar').style.width = d.pct + '%';
+  document.getElementById('demo-spend-label').textContent =
+    `NPR ${d.spend.toLocaleString()} / ${d.total.toLocaleString()}`;
+  document.getElementById('engine-caption').textContent = d.caption;
+}
+
+// Season tabs
+document.querySelectorAll('.season-tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.season-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentSeason = btn.dataset.season;
+    updateDemo();
+  });
+});
+
+// Budget slider
+const budgetSlider = document.getElementById('budget-slider');
+function updateBudgetUI() {
+  const v = parseInt(budgetSlider.value);
+  const pct = ((v - 8000) / (100000 - 8000)) * 100;
+  budgetSlider.style.setProperty('--pct', pct + '%');
+  document.getElementById('budget-display-label').textContent = `NPR ${v.toLocaleString()}`;
+  document.getElementById('budget-val').textContent           = `NPR ${v.toLocaleString()}`;
+  const perDay = Math.round(v / 5);
+  const tier = getBudgetTier(perDay);
+  const tierEl = document.getElementById('budget-tier');
+  tierEl.textContent    = tier.label;
+  tierEl.style.background = tier.bg;
+  tierEl.style.color    = tier.color;
+}
+budgetSlider.addEventListener('input', () => { updateBudgetUI(); updateDemo(); });
+updateBudgetUI();
+
+// Interest chips
+document.querySelectorAll('.interest-chip').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.classList.toggle('selected');
+    const sel = document.querySelector('.interest-chip.selected');
+    currentInterest = sel ? sel.dataset.int : 'adventure';
+    updateDemo();
+  });
+});
+
+updateDemo();
+
+/* ─────────────────────────────────────────────
+   DESTINATIONS
+───────────────────────────────────────────── */
+const fallbackDests = [
+  { id:1, name:'Pokhara',    region:'Gandaki',  cost_per_day:3500, rating:4.9, seasons:['Spring','Autumn'],  color:'#1E3A34' },
+  { id:2, name:'Kathmandu',  region:'Bagmati',  cost_per_day:2800, rating:4.8, seasons:['Autumn','Winter'],  color:'#2B3A45' },
+  { id:3, name:'Chitwan',    region:'Narayani', cost_per_day:4200, rating:4.7, seasons:['Spring','Autumn'],  color:'#1a2a38' },
+  { id:4, name:'Bhaktapur',  region:'Bagmati',  cost_per_day:1800, rating:4.6, seasons:['Autumn','Spring'],  color:'#1E3024' },
+  { id:5, name:'Nagarkot',   region:'Bagmati',  cost_per_day:2200, rating:4.5, seasons:['Autumn','Winter'],  color:'#25383A' },
+  { id:6, name:'Lumbini',    region:'Rupandehi',cost_per_day:1500, rating:4.4, seasons:['Winter','Spring'],  color:'#2a3520' },
+];
+
+function starsHTML(rating) {
+  return Array.from({length:5},(_,i) =>
+    `<div class="star ${i < Math.round(rating) ? 'filled' : ''}"></div>`).join('');
+}
+
+function renderDests(data) {
+  const grid = document.getElementById('dest-grid');
+  grid.innerHTML = data.map((d,i) => `
+    <a href="/destinations/${d.id}" class="dest-card reveal ${i===0?'reveal-delay-0':'reveal-delay-'+Math.min(i,4)}"
+      aria-label="${d.name}, ${d.region}">
+      <div class="dest-card-img-wrap">
+        <div class="dest-card-img" style="background:${d.color};background-image:linear-gradient(135deg,${d.color} 0%,${d.color}aa 100%);height:100%;width:100%"></div>
+      </div>
+      <div class="dest-card-overlay" aria-hidden="true"></div>
+      <div class="dest-card-body">
+        <div class="dest-name">${d.name}</div>
+        <div class="dest-region">${d.region} Province</div>
+        <div class="dest-meta">
+          <span class="dest-cost">NPR ${d.cost_per_day.toLocaleString()}/day</span>
+          <div class="dest-stars" aria-label="${d.rating} out of 5 stars">${starsHTML(d.rating)}</div>
+        </div>
+        <div style="display:flex;gap:0.4rem;margin-top:0.5rem;flex-wrap:wrap">
+          ${d.seasons.map(s=>`<span style="font-size:0.65rem;padding:0.15rem 0.5rem;border-radius:100px;background:rgba(200,151,58,0.15);color:rgba(200,151,58,0.8)">${s}</span>`).join('')}
+        </div>
+      </div>
+      <div class="dest-hover-cta" aria-hidden="true">View <span>→</span></div>
+    </a>
+  `).join('');
+
+  // 3D tilt
+  if (!prefersReduced.matches) {
+    document.querySelectorAll('.dest-card').forEach(card => {
+      card.addEventListener('mousemove', e => {
+        const r = card.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width  - 0.5;
+        const y = (e.clientY - r.top)  / r.height - 0.5;
+        card.style.transform = `perspective(800px) rotateY(${x*6}deg) rotateX(${-y*6}deg)`;
+      });
+      card.addEventListener('mouseleave', () => {
+        card.style.transition = 'transform 0.5s var(--ease-out)';
+        card.style.transform  = '';
+        setTimeout(() => card.style.transition = '', 500);
+      });
+    });
+  }
+}
+
+renderDests(fallbackDests);
+fetch('/api/destinations/list.php?limit=6&sort=rating')
+  .then(r => r.json())
+  .then(data => { if (Array.isArray(data) && data.length) renderDests(data); })
+  .catch(() => {});
+
+/* ─────────────────────────────────────────────
+   INTEREST TILES
+───────────────────────────────────────────── */
+const interestData = [
+  { name:'Adventure & Trekking', sub:'Annapurna · Everest · Langtang', color:'#1E3A34', icon:'M12 2L2 19h20L12 2z' },
+  { name:'Cultural & Heritage',  sub:'Durbar Squares · Monasteries',    color:'#2B3A45', icon:'M3 12h18M3 6h18M3 18h18' },
+  { name:'Nature & Wildlife',    sub:'Chitwan · Bardia · Koshi Tappu',  color:'#1a2a38', icon:'M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z' },
+  { name:'Food & Local Cuisine', sub:'Momos · Thakali · Newari',        color:'#1E3024', icon:'M18 8h1a4 4 0 0 1 0 8h-1M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z' },
+  { name:'Wellness & Spiritual', sub:'Meditation · Yoga · Lumbini',     color:'#25383A', icon:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 4v8l4 2' },
+  { name:'Photography',          sub:'Golden hour · Ancient temples',   color:'#2a3520', icon:'M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z M12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z' },
+];
+const selectedInterests = new Set();
+
+function renderInterests() {
+  const wrap = document.getElementById('interest-tiles');
+  wrap.innerHTML = interestData.map((t, i) => `
+    <div class="interest-tile reveal reveal-delay-${Math.min(i,4)}" role="listitem"
+      data-index="${i}" tabindex="0" aria-label="${t.name}" aria-pressed="false">
+      <div class="interest-tile-bg" style="background:${t.color};background-image:linear-gradient(135deg,${t.color} 0%,${t.color}cc 100%)"></div>
+      <div class="interest-tile-overlay" aria-hidden="true"></div>
+      <div class="interest-check" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <path d="M2 6l3 3 5-5" stroke="#0F1A22" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="interest-tile-body">
+        <svg class="interest-icon" viewBox="0 0 24 24" fill="none" stroke="rgba(244,239,230,0.8)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="${t.icon}"/>
+        </svg>
+        <div class="interest-name">${t.name}</div>
+        <div class="interest-sub">${t.sub}</div>
+      </div>
+    </div>
+  `).join('');
+
+  wrap.querySelectorAll('.interest-tile').forEach((tile, i) => {
+    function toggle() {
+      tile.classList.toggle('selected');
+      const pressed = tile.classList.contains('selected');
+      tile.setAttribute('aria-pressed', pressed);
+      if (pressed) selectedInterests.add(i); else selectedInterests.delete(i);
+      const btn = document.getElementById('interests-cta-btn');
+      if (selectedInterests.size > 0) {
+        btn.removeAttribute('disabled');
+        btn.style.opacity = '1';
+        btn.style.cursor  = 'pointer';
+      } else {
+        btn.setAttribute('disabled', '');
+        btn.style.opacity = '0.4';
+        btn.style.cursor  = 'default';
+      }
+    }
+    tile.addEventListener('click', toggle);
+    tile.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  });
+}
+renderInterests();
+
+document.getElementById('interests-cta-btn').addEventListener('click', () => {
+  const chosen = Array.from(selectedInterests).map(i => interestData[i].name).join(',');
+  sessionStorage.setItem('yp_interests', chosen);
+  window.location.href = '/register';
+});
+
+/* ─────────────────────────────────────────────
+   TRENDING ITINERARIES
+───────────────────────────────────────────── */
+const fallbackTickets = [
+  { dest:'Kathmandu → Pokhara → Chitwan', days:7, tier:'Mid-range', saves:248, cities:['Kathmandu','Pokhara','Chitwan'] },
+  { dest:'Pokhara → Annapurna BC',        days:12,tier:'Budget',    saves:197, cities:['Pokhara','Birethanti','ABC']    },
+  { dest:'Kathmandu → Bhaktapur → Nagarkot', days:4, tier:'Comfort', saves:184, cities:['Kathmandu','Bhaktapur','Nagarkot'] },
+  { dest:'Lumbini → Chitwan',             days:5, tier:'Budget',    saves:162, cities:['Lumbini','Sauraha']            },
+  { dest:'Kathmandu Valley Loop',         days:3, tier:'Mid-range', saves:141, cities:['Patan','Bhaktapur','Nagarkot'] },
+  { dest:'Pokhara → Mustang',             days:10,tier:'Luxury',    saves:120, cities:['Pokhara','Jomsom','Lo Manthang']},
+];
+
+function renderTickets(data) {
+  const row = document.getElementById('tickets-row');
+  row.innerHTML = data.slice(0,3).map(t => `
+    <div class="ticket reveal">
+      <div class="ticket-header">
+        <span class="ticket-dest">${t.cities[0]} → ${t.cities[t.cities.length-1]}</span>
+        <span class="ticket-days">${t.days} days</span>
+      </div>
+      <div class="ticket-perf" aria-hidden="true"></div>
+      <div class="ticket-body">
+        <div class="ticket-route">
+          ${t.cities.map((c,i,arr) => i < arr.length-1
+            ? `<span class="ticket-city">${c}</span><div class="ticket-arrow" aria-hidden="true"></div>`
+            : `<span class="ticket-city">${c}</span>`).join('')}
+        </div>
+        <div class="ticket-meta">
+          <span class="ticket-chip budget">${t.tier}</span>
+          <span class="ticket-chip">${t.days} nights</span>
+        </div>
+      </div>
+      <div class="ticket-footer">
+        <span class="ticket-saves">♥ ${t.saves} saves</span>
+        <a href="/register" class="ticket-use">Use as template →</a>
+      </div>
+    </div>
+  `).join('');
+}
+renderTickets(fallbackTickets);
+
+fetch('/api/itinerary/fetch.php?public=1&sort=saves&limit=6')
+  .then(r => r.json())
+  .then(data => { if (Array.isArray(data) && data.length) renderTickets(data); })
+  .catch(() => {});
+
+/* ─────────────────────────────────────────────
+   STATS COUNTER
+───────────────────────────────────────────── */
+const statsData = { dest:68, act:420, plans:3200, reviews:1140 };
+
+function animateCount(el, target, dur) {
+  if (prefersReduced.matches) { el.innerHTML = `${target.toLocaleString()}<span>+</span>`; return; }
+  const start = performance.now();
+  function step(now) {
+    const pct  = Math.min((now - start) / dur, 1);
+    const ease = 1 - Math.pow(1 - pct, 3);
+    el.innerHTML = `${Math.round(ease * target).toLocaleString()}<span>+</span>`;
+    if (pct < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+const statsObserver = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      animateCount(document.getElementById('stat-dest'),    statsData.dest,    1200);
+      animateCount(document.getElementById('stat-act'),     statsData.act,     1400);
+      animateCount(document.getElementById('stat-plans'),   statsData.plans,   1600);
+      animateCount(document.getElementById('stat-reviews'), statsData.reviews, 1800);
+      statsObserver.disconnect();
+    }
+  });
+}, { threshold: 0.3 });
+statsObserver.observe(document.getElementById('stats'));
+
+/* ─────────────────────────────────────────────
+   STORIES / REVIEWS
+───────────────────────────────────────────── */
+const fallbackReviews = [
+  { initials:'SK', name:'Sushma K.', trip:'Pokhara · Oct 2024',    rating:5, text:'I gave YatraPath my budget and three destinations. What came back was better than anything I could have planned in a week of research.' },
+  { initials:'RM', name:'Rahul M.',  trip:'Kathmandu · Sep 2024',  rating:5, text:'The season filter alone saved us from a miserable monsoon trek. It rerouted us to Bhaktapur instead. That decision made the whole trip.' },
+  { initials:'AL', name:'Anna L.',   trip:'Chitwan · Nov 2024',     rating:5, text:'Three seconds. I timed it. A seven-day plan with morning, afternoon and evening slots, all within my NPR budget. Extraordinary.' },
+  { initials:'PT', name:'Priya T.',  trip:'Annapurna · Oct 2024',  rating:5, text:'I travel solo and the route-optimisation gave me confidence that I wasn\'t backtracking or wasting a day between stops.' },
+];
+
+let currentReview   = 0;
+let reviewTimer;
+
+function renderReviews(data) {
+  const slider = document.getElementById('quote-slider');
+  const nav    = document.getElementById('quote-nav');
+
+  slider.innerHTML = data.map((r, i) => `
+    <div class="quote-slide ${i===0?'active':''}" id="review-${i}">
+      <blockquote class="quote-text">${r.text}</blockquote>
+      <div class="quote-author">
+        <div class="quote-avatar" aria-hidden="true">${r.initials}</div>
+        <div class="quote-meta">
+          <div class="quote-name">${r.name}</div>
+          <div class="quote-trip">${r.trip}</div>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  nav.innerHTML = data.map((_,i) =>
+    `<button class="quote-dot ${i===0?'active':''}" aria-label="Review ${i+1}" data-i="${i}"></button>`
+  ).join('');
+
+  nav.querySelectorAll('.quote-dot').forEach(dot => {
+    dot.addEventListener('click', () => goToReview(parseInt(dot.dataset.i)));
+  });
+}
+
+function goToReview(i) {
+  const slides = document.querySelectorAll('.quote-slide');
+  const dots   = document.querySelectorAll('.quote-dot');
+  if (!slides.length) return;
+  slides[currentReview].classList.remove('active');
+  dots[currentReview].classList.remove('active');
+  currentReview = i;
+  slides[currentReview].classList.add('active');
+  dots[currentReview].classList.add('active');
+}
+
+function startReviewTimer(data) {
+  clearInterval(reviewTimer);
+  reviewTimer = setInterval(() => {
+    goToReview((currentReview + 1) % data.length);
+  }, 5000);
+}
+
+function initReviews(data) {
+  renderReviews(data);
+  if (!prefersReduced.matches) startReviewTimer(data);
+  const slider = document.getElementById('quote-slider');
+  slider.addEventListener('mouseenter', () => clearInterval(reviewTimer));
+  slider.addEventListener('mouseleave', () => { if (!prefersReduced.matches) startReviewTimer(data); });
+}
+
+initReviews(fallbackReviews);
+fetch('/api/reviews/fetch.php?limit=8')
+  .then(r => r.json())
+  .then(data => { if (Array.isArray(data) && data.length) initReviews(data); })
+  .catch(() => {});
+
+/* ─────────────────────────────────────────────
+   MAP ANIMATION
+───────────────────────────────────────────── */
+const mapObserver = new IntersectionObserver(entries => {
+  if (!entries[0].isIntersecting || prefersReduced.matches) return;
+  const path = document.getElementById('route-path');
+  if (path) {
+    path.style.transition = 'stroke-dashoffset 1.4s cubic-bezier(0.22,1,0.36,1) 0.3s';
+    path.style.strokeDashoffset = '0';
+  }
+  ['pin-ktm','pin-pkr','pin-cht'].forEach((id, i) => {
+    const pin = document.getElementById(id);
+    if (!pin) return;
+    setTimeout(() => {
+      pin.querySelectorAll('circle').forEach(c => {
+        c.style.transition = 'opacity 0.5s';
+        c.style.opacity = '1';
+      });
+    }, 400 + i * 300);
+  });
+  mapObserver.disconnect();
+}, { threshold: 0.3 });
+const mapSection = document.getElementById('map-teaser');
+if (mapSection) mapObserver.observe(mapSection);
+
+/* ─────────────────────────────────────────────
+   INTERSECTION OBSERVER — REVEAL
+───────────────────────────────────────────── */
+const revealObserver = new IntersectionObserver(entries => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add('visible');
+      revealObserver.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+
+document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+</script>
+</body>
+</html>

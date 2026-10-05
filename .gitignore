@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+vendor/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+
+# Builds
+frontend/dist/
+frontend/build/
+
+# Uploads & Temp
+uploads/*
+!uploads/.gitkeep
+!uploads/destinations/.gitkeep
+tmp/
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

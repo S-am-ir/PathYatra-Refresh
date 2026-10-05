@@ -1,0 +1,11 @@
+.auth-page { display: grid; grid-template-columns: minmax(0,1fr) minmax(400px,1fr); min-height: min(780px, calc(100vh - 78px)); background: #f5f1e9; }
+.auth-image { background: linear-gradient(0deg,rgba(24,46,37,.38),transparent), url('/images/nepal-courtyard.webp') center 57% / cover; }
+.auth-panel { display: grid; place-items: center; padding: 4rem clamp(1.5rem,5vw,6rem); }
+.auth-panel__inner { width: min(100%,480px); }
+.auth-panel h1 { font: 400 clamp(2.8rem,4.5vw,4.6rem)/1.05 var(--font-display); letter-spacing: -.06em; margin: 1rem 0; }
+.auth-panel p { color: #68756a; margin-bottom: 2rem; }
+.auth-form { display: flex; flex-direction: column; gap: 1.15rem; }
+.auth-form button { margin-top: .5rem; }
+.auth-switch { padding-top: 1.6rem; margin-top: 1.5rem; border-top: 1px solid #d6cebf; color: #68756a; font-size: .85rem; }
+.auth-switch a { color: #2e5a40; font-weight: 700; border-bottom: 1px solid #8fad83; }
+@media (max-width: 830px) { .auth-page { grid-template-columns: 1fr; } .auth-image { display: none; } .auth-panel { min-height: 70vh; padding-block: 4rem; } }

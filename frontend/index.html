@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/brand-mark.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="PathYatra helps you plan a thoughtful journey through Nepal around your time, interests, and estimated budget." />
+    <title>PathYatra — Journeys through Nepal</title>
+
+    <!-- Critical CSS before React starts -->
+    <style>
+      *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+      html{scroll-behavior:auto}
+      body{background:#f5f1e9;color:#20372f;font-family:system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+      #root{min-height:100dvh}
+      /* Skip link */
+      .skip-link{position:absolute;left:-9999px;top:1rem;z-index:10000;padding:.75rem 1.5rem;background:#D3A045;color:#0F1A22;font-weight:700;border-radius:4px;text-decoration:none}
+      .skip-link:focus{left:1rem}
+    </style>
+
+    <!-- Google Fonts: Fraunces (display), Inter (body), Noto Serif Devanagari (accent) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;0,9..144,600;0,9..144,700;1,9..144,300;1,9..144,400;1,9..144,500;1,9..144,600;1,9..144,700&family=Inter:wght@300;400;500;600;700&family=Noto+Serif+Devanagari:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+
+  </head>
+  <body>
+    <a href="#main-content" class="skip-link">Skip to content</a>
+
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>

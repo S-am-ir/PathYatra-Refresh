@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+  <title id="title">PathYatra</title>
+  <rect width="64" height="64" rx="12" fill="#1b382e"/>
+  <path d="M8 37 22 21l9 10 9-15 16 21" fill="none" stroke="#f4eee2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M9 50c10-9 19-8 23-4s13 3 23-9" fill="none" stroke="#d6a35b" stroke-width="3" stroke-linecap="round"/>
+</svg>
