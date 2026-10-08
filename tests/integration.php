@@ -73,6 +73,14 @@ try {
     expect($traveler->request('POST','destinations/create.php',$fields),403,'Admin write protection');
     expect($admin->request('POST','destinations/create.php',array_replace($fields,['latitude'=>99])),422,'Coordinate validation');
     $created=expect($admin->request('POST','destinations/create.php',$fields),201,'Create destination'); $customDest=(int)$created['id'];
+    $longName = str_repeat('N', 150);
+    expect($admin->request('POST','destinations/update.php',array_replace($fields,['id'=>$customDest,'name'=>$longName])),200,'Maximum-length destination name');
+    $farPlace = (int)array_values(array_filter($catalog,fn($d)=>$d['name']==='Pokhara'))[0]['id'];
+    $longPlan = expect($traveler->request('POST','itinerary/generate.php',array_replace($request,['destinations'=>[$farPlace,$customDest],'days'=>5,'budget'=>25000])),200,'Generate transfer to long destination name');
+    if (!array_filter($longPlan['days'],fn($d)=>$d['destination']==='Transit to '.$longName)) throw new RuntimeException('Long-name regression must exercise a transfer day');
+    $longSaved = expect($traveler->request('POST','itinerary/save.php',['plan_token'=>$longPlan['plan_token']]),201,'Save transfer with maximum-length destination name');
+    $longLoaded = expect($traveler->request('GET','itinerary/fetch.php?id='.$longSaved['itinerary_id']),200,'Reopen long-name transfer');
+    if ($longLoaded['days'] !== $longPlan['days']) throw new RuntimeException('Long transit destination name must be preserved');
     expect($admin->request('POST','destinations/update.php',array_replace($fields,['id'=>$customDest,'name'=>'Updated '.$tag])),200,'Update destination');
     $activity=['destination_id'=>$customDest,'name'=>'Test activity','category'=>'cultural','duration_hours'=>7,'cost_npr'=>500,'preferred_slot'=>'Morning','seasons'=>['Autumn']];
     $created=expect($admin->request('POST','activities/create.php',$activity),201,'Create activity'); $activityId=$created['id'];

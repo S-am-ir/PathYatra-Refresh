@@ -11,6 +11,11 @@ foreach (['plan_token' => 'VARCHAR(64) DEFAULT NULL', 'plan_json' => 'JSON DEFAU
     $column->execute([$database, 'itineraries', $name]);
     if (!(int)$column->fetchColumn()) $db->exec("ALTER TABLE itineraries ADD COLUMN {$name} {$definition}");
 }
+// A valid 150-character catalog name can also appear as "Transit to <name>".
+// Widen existing installations without truncating their saved day labels.
+$length = $db->prepare('SELECT CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?');
+$length->execute([$database, 'itin_days', 'destination_name']);
+if ((int)$length->fetchColumn() < 200) $db->exec('ALTER TABLE itin_days MODIFY destination_name VARCHAR(200) NOT NULL');
 $index = $db->prepare('SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND INDEX_NAME = ?');
 $index->execute([$database, 'itineraries', 'plan_token']); $hasOriginal = (int)$index->fetchColumn();
 $index->execute([$database, 'itineraries', 'unique_plan_token']);

@@ -89,7 +89,7 @@ CREATE TABLE IF NOT EXISTS `itin_days` (
     `day_number` INT NOT NULL,
     `day_date` DATE NOT NULL,
     `destination_id` INT DEFAULT NULL,
-    `destination_name` VARCHAR(150) NOT NULL,
+    `destination_name` VARCHAR(200) NOT NULL,
     `accommodation_name` VARCHAR(150) DEFAULT NULL,
     `accommodation_cost` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
     `day_total` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
