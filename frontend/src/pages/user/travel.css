@@ -102,3 +102,12 @@
   .day-card__top { flex-wrap: wrap; }
   .day-card__top > strong { margin-left: auto; }
 }
+.origin-controls { display: flex; flex-direction: column; gap: .85rem; }
+.origin-controls select { padding: .75rem; width: 100%; background: white; border: 1px solid #c5cfbe; color: #1b382e; }
+.origin-controls button { align-self: start; }
+.detail-section { margin-top: 3rem; }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 1rem; }
+.detail-grid .day-card, .detail-section > .day-card { padding: 1.5rem; }
+.detail-section .admin-form { display: grid; gap: 1rem; margin: 1rem 0; }
+.detail-section .admin-form label { display: grid; gap: .5rem; }
+.detail-section textarea, .detail-section select { padding: .75rem; border: 1px solid #c5cfbe; background: white; width: 100%; }

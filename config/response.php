@@ -31,6 +31,8 @@ function getJsonInput(): array {
     if (empty($raw)) {
         return $_POST ?? [];
     }
-    $decoded = json_decode($raw, true);
-    return is_array($decoded) ? $decoded : [];
+    try { $decoded = json_decode($raw, true, 512, JSON_THROW_ON_ERROR); }
+    catch (JsonException $error) { jsonError('Request body must be valid JSON.', 422); }
+    if (!is_array($decoded) || (array_is_list($decoded) && $decoded !== [])) jsonError('Request body must be a JSON object.', 422);
+    return $decoded;
 }

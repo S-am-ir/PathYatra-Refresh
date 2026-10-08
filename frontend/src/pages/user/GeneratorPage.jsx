@@ -26,6 +26,10 @@ export default function GeneratorPage() {
   const [loading, setLoading] = useState(false);
   const [catalogLoading, setCatalogLoading] = useState(true);
   const [error, setError] = useState('');
+  const [origin, setOrigin] = useState(null);
+  const [locating, setLocating] = useState(false);
+  const [locationMessage, setLocationMessage] = useState('');
+  const [manualStart, setManualStart] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -43,6 +47,15 @@ export default function GeneratorPage() {
     return () => { active = false; };
   }, [location.state?.destination]);
 
+  const locate = () => {
+    if (!navigator.geolocation) { setLocationMessage('Location is unavailable in this browser. Choose a starting place below.'); return; }
+    setLocating(true); setLocationMessage('');
+    navigator.geolocation.getCurrentPosition(({ coords }) => {
+      setOrigin({ latitude: coords.latitude, longitude: coords.longitude, label: 'Current location' });
+      setManualStart(''); setLocationMessage('Current location set as your origin.'); setLocating(false);
+    }, () => { setLocationMessage('Location could not be obtained. Allow browser permission on HTTPS or localhost, or choose a starting place below.'); setLocating(false); }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 });
+  };
+
   const toggle = (id) => {
     setError('');
     setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
@@ -55,7 +68,7 @@ export default function GeneratorPage() {
     if (step === 1 && (!startDate || startDate < localDate(0))) { setError('Choose a valid start date from today onward.'); return; }
     if (step === 1 && (!Number.isInteger(Number(days)) || Number(days) < 1 || Number(days) > 30)) { setError('Choose a trip length between 1 and 30 days.'); return; }
     if (step === 1 && Number(days) < selected.length) { setError('Allow at least one day for each selected destination.'); return; }
-    if (step === 2 && (!Number.isFinite(Number(budget)) || Number(budget) < 3000)) { setError('Set a total budget of at least NPR 3,000.'); return; }
+    if (step === 2 && (!Number.isFinite(Number(budget)) || Number(budget) < 1500)) { setError('Set a total budget of at least NPR 1,500.'); return; }
     if (step === 2 && Number(budget) / Number(days) < 1500) { setError('Allow at least NPR 1,500 per day for the estimated stay, or shorten the trip.'); return; }
     setError('');
     setStep((current) => current + 1);
@@ -66,7 +79,7 @@ export default function GeneratorPage() {
     setLoading(true); setError('');
     try {
       const res = await api.post('/itinerary/generate.php', {
-        destinations: selected, start_date: startDate, days: Number(days), budget: Number(budget), interests,
+        destinations: selected, start_date: startDate, days: Number(days), budget: Number(budget), interests, ...(origin ? { origin } : {}),
       });
       if (!res.success) throw new Error(res.message || 'Could not create a plan.');
       sessionStorage.setItem('pathyatra_latest_plan', JSON.stringify(res.data));
@@ -92,7 +105,12 @@ export default function GeneratorPage() {
             <div className="planner-panel__top"><span>Step {step + 1} of 4</span><span>{steps[step]}</span></div>
             {error && <div className="travel-error" role="alert">{error}</div>}
             {step === 0 && <div>
-              <h2>Where will you go?</h2><p>Choose one or more places. We will use the first selected place as the starting point.</p>
+              <h2>Where will you go?</h2><p>Choose one or more places. With an origin, the closest selected stop comes first; otherwise the first place you select starts the route.</p>
+              <div className="planner-note origin-controls"><strong>Starting point</strong><button type="button" className="button button--outline" onClick={locate} disabled={locating}>{locating ? 'Finding location…' : 'Use my current location'}</button>
+                <label>Or choose a starting place<select value={manualStart} onChange={(event) => { const value = event.target.value; setManualStart(value); const place = destinations.find((d) => String(d.id) === value); setOrigin(place ? { latitude: Number(place.latitude), longitude: Number(place.longitude), label: place.name } : null); setLocationMessage(''); }}><option value="">First selected destination</option>{destinations.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select></label>
+                {origin && <p>Origin: {origin.label} · {Number(origin.latitude).toFixed(4)}, {Number(origin.longitude).toFixed(4)} <button type="button" onClick={() => { setOrigin(null); setManualStart(''); setLocationMessage(''); }}>Clear</button></p>}
+                {locationMessage && <p role="status">{locationMessage}</p>}<small>Location is requested only when you tap the button. It sets route order; travel to the first stop is not scheduled.</small>
+              </div>
               {catalogLoading ? <div className="travel-empty">Loading destinations…</div> : destinations.length === 0 ? <div className="travel-empty">No destinations are available right now.</div> :
                 <div className="planner-options">{destinations.map((place) => {
                   const id = Number(place.id), active = selected.includes(id);
@@ -104,10 +122,10 @@ export default function GeneratorPage() {
             {step === 1 && <div><h2>When are you traveling?</h2><p>The trip month helps filter activities by their catalog season tags.</p>
               <div className="planner-fields"><label>Start date<input type="date" min={localDate(0)} value={startDate} onChange={(event) => setStartDate(event.target.value)} required /></label>
               <label>Number of days<input type="number" min={Math.max(1, selected.length)} max="30" value={days} onChange={(event) => setDays(event.target.value)} required /></label></div>
-              <div className="planner-note">Allow at least one day per destination. Travel between places is not included in activity time estimates.</div>
+              <div className="planner-note">Allow at least one day per destination. Longer intercity legs reserve transfer days. The planner may ask for more days after it calculates your route.</div>
             </div>}
             {step === 2 && <div><h2>Set an estimated budget.</h2><p>Enter a total in Nepali rupees. The current planner estimates accommodation by tier and selects activities within a daily allowance.</p>
-              <div className="planner-fields"><label>Trip budget · NPR<input type="number" min="3000" step="500" value={budget} onChange={(event) => setBudget(event.target.value)} required /></label>
+              <div className="planner-fields"><label>Trip budget · NPR<input type="number" min="1500" step="500" value={budget} onChange={(event) => setBudget(event.target.value)} required /></label>
               <div className="planner-budget"><span>About</span><strong>{formatNPR(Number(budget) / Number(days || 1))}</strong><span>per day</span></div></div>
               <div className="planner-note">Estimates exclude transport, meals, and live hotel availability. Confirm local prices before booking.</div>
             </div>}

@@ -23,6 +23,7 @@ class RouteOptimizer {
              cos($lat1Rad) * cos($lat2Rad) *
              sin($deltaLon / 2) ** 2;
 
+        $a = max(0.0, min(1.0, $a));
         $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
 
         return self::EARTH_RADIUS_KM * $c;
@@ -34,8 +35,8 @@ class RouteOptimizer {
      * @param array $destinations Array of associative arrays with 'id', 'name', 'latitude', 'longitude'
      * @return array Ordered sequence of destinations
      */
-    public static function optimizeRoute(array $destinations): array {
-        if (count($destinations) <= 2) {
+    public static function optimizeRoute(array $destinations, ?array $origin = null): array {
+        if (count($destinations) <= 1) {
             return $destinations;
         }
 
@@ -43,7 +44,15 @@ class RouteOptimizer {
         $ordered = [];
 
         // Start with the first destination selected by traveler
-        $current = array_shift($unvisited);
+        if ($origin !== null) {
+            $distances = array_map(fn($d) => self::calculateDistance((float)$origin['latitude'], (float)$origin['longitude'], (float)$d['latitude'], (float)$d['longitude']), $unvisited);
+            $first = array_search(min($distances), $distances, true);
+            $current = $unvisited[$first];
+            unset($unvisited[$first]);
+            $unvisited = array_values($unvisited);
+        } else {
+            $current = array_shift($unvisited);
+        }
         $ordered[] = $current;
 
         while (!empty($unvisited)) {

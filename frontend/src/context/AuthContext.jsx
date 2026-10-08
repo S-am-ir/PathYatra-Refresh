@@ -9,6 +9,9 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     checkSession();
+    const clear = () => { setUser(null); sessionStorage.removeItem('pathyatra_latest_plan'); };
+    window.addEventListener('pathyatra:session-expired', clear);
+    return () => window.removeEventListener('pathyatra:session-expired', clear);
   }, []);
 
   const checkSession = async () => {
@@ -29,6 +32,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     const res = await api.post('/auth/login.php', { email, password });
     if (res.success) {
+      sessionStorage.removeItem('pathyatra_latest_plan');
       setUser(res.data.user);
       return res.data.user;
     }
@@ -38,6 +42,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     const res = await api.post('/auth/register.php', userData);
     if (res.success) {
+      sessionStorage.removeItem('pathyatra_latest_plan');
       setUser(res.data.user);
       return res.data.user;
     }
@@ -45,11 +50,9 @@ export const AuthProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    try {
-      await api.post('/auth/logout.php');
-    } finally {
-      setUser(null);
-    }
+    await api.post('/auth/logout.php');
+    sessionStorage.removeItem('pathyatra_latest_plan');
+    setUser(null);
   };
 
   return (

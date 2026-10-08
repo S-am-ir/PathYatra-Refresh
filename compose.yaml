@@ -1,0 +1,74 @@
+name: pathyatra-refresh
+x-api: &api
+  image: pathyatra-refresh-api:local
+  build:
+    context: .
+    dockerfile: docker/php.Dockerfile
+  environment: &database-env
+    DB_HOST: db
+    DB_PORT: 3306
+    DB_NAME: yatra_db
+    DB_USER: pathyatra
+    DB_PASS: ${DB_PASSWORD:-pathyatra_local}
+    ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5180,http://127.0.0.1:5180}
+services:
+  db:
+    image: mariadb:10.11
+    environment:
+      MARIADB_DATABASE: yatra_db
+      MARIADB_USER: pathyatra
+      MARIADB_PASSWORD: ${DB_PASSWORD:-pathyatra_local}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-pathyatra_root_local}
+    volumes:
+      - database:/var/lib/mysql
+    healthcheck:
+      test: [CMD, healthcheck.sh, --connect, --innodb_initialized]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+  init:
+    <<: *api
+    command: [php, database/migrate.php]
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    <<: *api
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: [CMD, php, -r, "exit(@file_get_contents('http://localhost/api/health.php') === false ? 1 : 0);"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    ports:
+      - '${APP_PORT:-5180}:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, --spider, http://localhost/]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+  test:
+    <<: *api
+    profiles: [test]
+    command: [php, tests/run.php]
+    environment:
+      <<: *database-env
+      TEST_BASE_URL: http://api
+      TEST_ALLOW_WRITES: '1'
+    depends_on:
+      api:
+        condition: service_healthy
+volumes:
+  database:

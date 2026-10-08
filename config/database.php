@@ -22,7 +22,8 @@ class Database {
         $this->password = getenv('DB_PASS') !== false ? getenv('DB_PASS') : '';
         $this->charset = 'utf8mb4';
 
-        $dsn = "mysql:host={$this->host};dbname={$this->dbname};charset={$this->charset}";
+        $port = (int)(getenv('DB_PORT') ?: 3306);
+        $dsn = "mysql:host={$this->host};port={$port};dbname={$this->dbname};charset={$this->charset}";
         $options = [
             PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
             PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,

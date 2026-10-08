@@ -25,6 +25,7 @@ export default function MyItineraries() {
   useEffect(() => { load(); }, []);
 
   const complete = async (id) => {
+    setError(''); setMessage('');
     try {
       await api.post('/itinerary/complete.php', { id });
       setMessage('Trip marked complete.');
@@ -33,6 +34,7 @@ export default function MyItineraries() {
   };
   const remove = async (id) => {
     if (!window.confirm('Delete this saved trip? This cannot be undone.')) return;
+    setError(''); setMessage('');
     try {
       await api.delete(`/itinerary/delete.php?id=${id}`);
       setMessage('Trip deleted.');
@@ -54,7 +56,7 @@ export default function MyItineraries() {
       <div className="trip-list">{items.map((item, index) => <article className="trip-card" key={item.id}>
         <div className="trip-card__number">{String(index + 1).padStart(2, '0')}</div>
         <div className="trip-card__body"><span className="eyebrow">{item.status === 'completed' ? 'Completed journey' : 'Planned journey'}</span><h2><Link to={`/itinerary/${item.id}`}>{item.title}</Link></h2><p>{formatDate(item.start_date)} – {formatDate(item.end_date)} · {item.total_days} days · {item.season}</p><small>Estimated stay + activities {formatNPR(item.estimated_cost)} · Budget {formatNPR(item.total_budget)}</small></div>
-        <div className="trip-card__actions"><Link to={`/itinerary/${item.id}`} className="trip-card__view">View plan <ArrowRight size={16} /></Link><button type="button" onClick={() => download(item.id)}><Download size={16} /> PDF</button>{item.status === 'planned' && <button type="button" onClick={() => complete(item.id)}>Mark complete</button>}<button type="button" className="trip-card__delete" aria-label={`Delete ${item.title}`} onClick={() => remove(item.id)}><Trash2 size={16} /></button></div>
+        <div className="trip-card__actions"><Link to={`/itinerary/${item.id}`} className="trip-card__view">View plan <ArrowRight size={16} /></Link><button type="button" onClick={() => download(item.id)}><Download size={16} /> PDF</button>{item.status === 'planned' && <button type="button" onClick={() => complete(item.id)} title="Available on or after the final trip date">Mark complete</button>}<button type="button" className="trip-card__delete" aria-label={`Delete ${item.title}`} onClick={() => remove(item.id)}><Trash2 size={16} /></button></div>
       </article>)}</div>}
   </div></div>;
 }

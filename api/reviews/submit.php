@@ -1,47 +1,21 @@
 <?php
-/**
- * YatraPath API - Submit Review Endpoint
- */
 declare(strict_types=1);
-
-require_once __DIR__ . '/../../config/session.php';
-require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../config/cors.php';
-require_once __DIR__ . '/../../config/response.php';
-require_once __DIR__ . '/../../config/validator.php';
-
-requireLogin(true);
-
-$input = getJsonInput();
-$userId = getCurrentUserId();
-$destId = (int)($input['destination_id'] ?? 0);
-$rating = (int)($input['rating'] ?? 5);
-$comment = Validator::sanitizeString($input['comment'] ?? '');
-$tripDate = Validator::sanitizeString($input['trip_month_year'] ?? date('F Y'));
-
-if ($destId <= 0 || $rating < 1 || $rating > 5 || mb_strlen($comment) < 10) {
-    jsonError('Destination ID, rating (1-5), and a review comment of at least 10 characters are required.', 422);
-}
-
+require_once __DIR__ . '/../../config/api.php';
+require_once __DIR__ . '/../../lib/Catalog.php';
+$input = apiRequest(['POST'], 'traveler');
+if (getCurrentUserRole() !== 'traveler') jsonError('Reviews are available to travelers.', 403);
+$id = positiveId($input['destination_id'] ?? 0, 'destination ID'); recordExists('destinations', $id);
+$rating = filter_var($input['rating'] ?? null, FILTER_VALIDATE_INT);
+if ($rating === false || $rating < 1 || $rating > 5) jsonError('Rating must be an integer from 1 to 5.', 422);
+$comment = Validator::text($input['comment'] ?? '', 'Review', 10, 2000);
+$trip = reviewEligibility($id, getCurrentUserId());
+if (!$trip) jsonError('Complete a saved trip containing this destination before reviewing it.', 403);
+$db = db(); $db->beginTransaction();
 try {
-    $db = Database::getInstance()->getConnection();
-    $stmt = $db->prepare("
-        INSERT INTO reviews (user_id, destination_id, rating, comment, trip_month_year)
-        VALUES (?, ?, ?, ?, ?)
-    ");
-    $stmt->execute([$userId, $destId, $rating, $comment, $tripDate]);
-
-    // Update destination avg rating and count
-    $recalc = $db->prepare("
-        UPDATE destinations 
-        SET avg_rating = (SELECT ROUND(AVG(rating), 2) FROM reviews WHERE destination_id = ?),
-            total_reviews = (SELECT COUNT(*) FROM reviews WHERE destination_id = ?)
-        WHERE id = ?
-    ");
-    $recalc->execute([$destId, $destId, $destId]);
-
-    jsonSuccess(['id' => (int)$db->lastInsertId()], 'Review submitted successfully', 201);
-
-} catch (Throwable $e) {
-    jsonError('Failed to submit review: ' . $e->getMessage(), 500);
-}
+    $q = $db->prepare('SELECT id FROM destinations WHERE id = ? FOR UPDATE'); $q->execute([$id]);
+    if (!$q->fetchColumn()) { $db->rollBack(); jsonError('Destination not found.', 404); }
+    $q = $db->prepare('INSERT INTO reviews (user_id, destination_id, rating, comment, trip_month_year) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment), trip_month_year = VALUES(trip_month_year), created_at = CURRENT_TIMESTAMP');
+    $q->execute([getCurrentUserId(), $id, $rating, $comment, date('F Y', strtotime($trip['end_date']))]);
+    $q = $db->prepare('UPDATE destinations SET avg_rating = (SELECT ROUND(AVG(rating), 2) FROM reviews WHERE destination_id = ?), total_reviews = (SELECT COUNT(*) FROM reviews WHERE destination_id = ?) WHERE id = ?'); $q->execute([$id, $id, $id]);
+    $db->commit(); jsonSuccess(null, 'Review saved');
+} catch (Throwable $e) { if ($db->inTransaction()) $db->rollBack(); throw $e; }

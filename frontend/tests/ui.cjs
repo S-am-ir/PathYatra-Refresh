@@ -1,0 +1,80 @@
+if (process.env.TEST_ALLOW_WRITES !== '1') throw Error('Set TEST_ALLOW_WRITES=1 only against a local/test installation.');
+const { JSDOM } = require(process.env.TEST_JSDOM_MODULE || 'jsdom');
+const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
+const repo=require('node:path').resolve(__dirname,'../..');
+const base=process.env.TEST_BASE_URL || 'http://127.0.0.1:8001';
+const php=(code,...args)=>execFileSync(process.env.TEST_PHP_BIN || 'php',[...(process.env.TEST_PHP_INI?['-c',process.env.TEST_PHP_INI]:[]),'-r','require $argv[1]; '+code,repo+'/config/database.php',...args]);
+const dom=new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>',{url:base+'/generator',pretendToBeVisual:true});
+for(const key of ['window','document','HTMLElement','Element','Node','XMLHttpRequest','sessionStorage','localStorage','MutationObserver','Event','MouseEvent','PopStateEvent']) global[key]=dom.window[key];
+Object.defineProperty(global,'navigator',{value:dom.window.navigator,configurable:true});
+global.requestAnimationFrame=dom.window.requestAnimationFrame.bind(dom.window); global.cancelAnimationFrame=dom.window.cancelAnimationFrame.bind(dom.window);
+let locationAllowed=false;
+navigator.geolocation={getCurrentPosition:(success,failure)=>setTimeout(()=>locationAllowed?success({coords:{latitude:28.2096,longitude:83.9856}}):failure({code:1}),0)};
+window.confirm=()=>true;
+const React=require(repo+'/frontend/node_modules/react');
+dom.window.HTMLCanvasElement.prototype.getContext=()=>null;
+const { flushSync }=require(repo+'/frontend/node_modules/react-dom');
+const { createRoot }=require(repo+'/frontend/node_modules/react-dom/client');
+const { Simulate }=require(repo+'/frontend/node_modules/react-dom/test-utils');
+const errors=[]; const originalError=console.error;
+console.error=(...args)=>{if(!String(args[0]).includes('React Router Future Flag'))errors.push(args.map(String).join(' ')); originalError(...args);};
+const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function wait(fn,label){for(let i=0;i<400;i++){if(fn())return;await delay(10);}throw Error('Timeout: '+label+' at '+window.location.pathname+' '+document.body.textContent.slice(-500));}
+const button=(text)=>[...document.querySelectorAll('button')].find(e=>e.textContent.trim()===text);
+const field=(text)=>[...document.querySelectorAll('label')].find(e=>e.textContent.startsWith(text))?.querySelector('input,select,textarea');
+function fill(text,value){const el=field(text);assert(el,'Field '+text); flushSync(()=>Simulate.change(el,{target:{value:String(value)}}));}
+function press(text){const el=button(text);assert(el,'Button '+text);assert(!el.disabled,'Enabled '+text);flushSync(()=>el.click());}
+function go(path){window.history.pushState({},'',path);window.dispatchEvent(new window.PopStateEvent('popstate'));}
+async function formSubmit(){const form=document.querySelector('form');assert(form);form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));await delay(10);}
+let vite,root; const tag=Date.now(); const email=`dom_${tag}@example.com`; const custom='DOM catalog '+tag;
+(async()=>{
+ const { createServer }=await import(repo+'/frontend/node_modules/vite/dist/node/index.js');
+ vite=await createServer({root:repo+'/frontend',server:{middlewareMode:true},appType:'custom'});
+ const auth=await vite.ssrLoadModule('/src/context/AuthContext.jsx');
+ const router=await vite.ssrLoadModule('/src/components/common/ProtectedRoute.jsx');
+ const names=['public/LoginPage','public/RegisterPage','public/DestinationsExplorer','public/DestinationDetail','user/GeneratorPage','user/MyItineraries','user/UserDashboard','admin/AdminCatalog']; const modules={};
+ for(const name of names)modules[name]= (await vite.ssrLoadModule('/src/pages/'+name+'.jsx')).default;
+ const { BrowserRouter,Routes,Route }=require(repo+'/frontend/node_modules/react-router-dom');
+ const h=React.createElement;
+ const route=(path,name,protectedRoute=false,adminOnly=false)=>h(Route,{key:path,path,element:protectedRoute?h(router.default,{adminOnly},h(modules[name])):h(modules[name])});
+ root=createRoot(document.getElementById('root'));
+ root.render(h(auth.AuthProvider,null,h(BrowserRouter,null,h(Routes,null,[route('/login','public/LoginPage'),route('/register','public/RegisterPage'),route('/generator','user/GeneratorPage',true),route('/my-itineraries','user/MyItineraries',true),route('/dashboard','user/UserDashboard',true),route('/admin/:section','admin/AdminCatalog',true,true),route('/destinations','public/DestinationsExplorer'),route('/destinations/:id','public/DestinationDetail'),h(Route,{path:'/itinerary-result',key:'result',element:h('p',null,'Result navigation reached')}),h(Route,{path:'/admin',key:'admin',element:h('p',null,'Admin navigation reached')})]))));
+ await wait(()=>window.location.pathname==='/login'&&field('Email address'),'Protected route redirect');
+ document.querySelector('a[href="/register"]').click();await wait(()=>field('Your name'),'Registration form');
+ fill('Your name','DOM Test Traveler');fill('Email address',email);fill('Password ·','DOM@12345');fill('Confirm password','DOM@12345');await formSubmit();
+ await wait(()=>window.location.pathname==='/generator'&&document.querySelectorAll('.planner-option').length>=25,'Registration redirect retains planner');
+ press('Use my current location');await wait(()=>document.body.textContent.includes('Location could not be obtained.'),'Location denial fallback');
+ fill('Or choose a starting place', '2');await wait(()=>document.body.textContent.includes('Origin: Pokhara'),'Manual origin');
+ locationAllowed=true;press('Use my current location');await wait(()=>document.body.textContent.includes('Current location set as your origin.'),'Location success');
+ for(const name of ['Kathmandu Valley','Pokhara'])[...document.querySelectorAll('.planner-option')].find(e=>e.querySelector('strong').textContent===name).click();
+ await delay(10);
+ press('Continue');await wait(()=>field('Number of days'),'Dates step');fill('Number of days',5);await delay(5);press('Continue');await wait(()=>field('Trip budget'),'Budget step');
+ fill('Trip budget',3000);await delay(5);press('Continue');await wait(()=>document.querySelector('[role="alert"]'),'Insufficient daily budget validation');
+ fill('Trip budget',30000);await delay(5);press('Continue');await wait(()=>button('Create my plan'),'Interests step');press('Create my plan');
+ await wait(()=>window.location.pathname==='/itinerary-result','Generation navigation');
+ const plan=JSON.parse(sessionStorage.getItem('pathyatra_latest_plan'));assert.equal(plan.map_data.destinations[0].name,'Pokhara');assert.equal(plan.origin.label,'Current location');assert.equal(plan.days.length,5);
+ const api=(await vite.ssrLoadModule('/src/services/api.js')).default;
+ const saved=await api.post('/itinerary/save.php',{plan_token:plan.plan_token});const id=saved.data.itinerary_id;
+ go('/my-itineraries');await wait(()=>button('Mark complete'),'Saved trips displayed');press('Mark complete');await wait(()=>document.body.textContent.includes('final travel date'),'Future completion validation');
+ php("Database::getInstance()->getConnection()->prepare('UPDATE itineraries SET end_date=? WHERE id=?')->execute([date('Y-m-d',strtotime('-2 days')),(int)$argv[2]]);",String(id));
+ press('Mark complete');await wait(()=>document.body.textContent.includes('Trip marked complete.'),'Completion UI');
+ go('/destinations/2');await wait(()=>field('Your experience'),'Verified review form');fill('Your experience','The verified completed plan was useful for our visit.');await formSubmit();await wait(()=>document.body.textContent.includes('Your review has been saved.'),'Review submit');
+ fill('Rating','4');await formSubmit();await wait(()=>document.body.textContent.includes('4.00 / 5 from 1 traveler reviews'),'Review edit recomputes average');
+ go('/my-itineraries');await wait(()=>document.querySelector('.trip-card__delete'),'Saved trip deletion');document.querySelector('.trip-card__delete').click();await wait(()=>document.body.textContent.includes('Trip deleted.'),'Delete UI');
+ go('/login');await wait(()=>field('Email address'),'Admin sign in form');fill('Email address','admin@yatra.com');fill('Password','Admin@123');await formSubmit();await wait(()=>window.location.pathname==='/admin','Admin sign in');assert.equal(sessionStorage.getItem('pathyatra_latest_plan'),null,'Account change clears plan cache');
+ go('/admin/destinations');await wait(()=>document.querySelectorAll('tbody tr').length>=25,'Admin catalog loaded');press('Add destination');await wait(()=>field('Description'),'Destination form');fill('Name',custom);fill('Description','A temporary DOM functional verification destination.');fill('Latitude',27.7);fill('Longitude',85.3);await formSubmit();await wait(()=>document.body.textContent.includes('Record created.'),'Admin destination creation');
+ fill('Search',custom);await delay(10);document.querySelector('tbody tr button').click();await wait(()=>field('Daily estimate'),'Edit form');fill('Daily estimate',2700);await formSubmit();await wait(()=>document.body.textContent.includes('Record updated.'),'Admin destination update');
+ go('/admin/activities');await wait(()=>document.querySelectorAll('tbody tr').length>=100,'Activities loaded');press('Add activity');await wait(()=>field('Name'),'Activity form');fill('Name','DOM activity '+tag);
+ const destinationField=document.querySelector('form').querySelector('select');const option=[...destinationField.options].find(o=>o.textContent===custom);assert(option);flushSync(()=>Simulate.change(destinationField,{target:{value:option.value}}));await formSubmit();await wait(()=>document.body.textContent.includes('Record created.'),'Admin activity creation');
+ fill('Search','DOM activity '+tag);await delay(10);[...document.querySelectorAll('tbody tr button')].find(b=>b.textContent==='Delete').click();await wait(()=>document.body.textContent.includes('Record deleted.'),'Admin activity deletion');
+ go('/admin/destinations');await wait(()=>document.querySelectorAll('tbody tr').length>=25,'Destinations reloaded');fill('Search',custom);await delay(10);[...document.querySelectorAll('tbody tr button')].find(b=>b.textContent==='Delete').click();await wait(()=>document.body.textContent.includes('Record deleted.'),'Admin destination deletion');
+ go('/admin/travelers');await wait(()=>document.querySelectorAll('tbody tr').length>=2,'Travelers loaded');fill('Search',email);await delay(10);press('Deactivate');await wait(()=>document.body.textContent.includes('Traveler status updated.'),'Traveler status action');
+ go('/destinations');await wait(()=>document.querySelectorAll('.explore-card').length>=25,'Explorer');fill('Filter by region','Terai');fill('Filter by season','Winter');fill('Activity category','cultural');fill('Maximum daily estimate','3000');await wait(()=>document.querySelectorAll('.explore-card').length<10,'Combined filter response');assert([...document.querySelectorAll('.explore-card')].every(e=>e.textContent.includes('Terai')));
+ assert.deepEqual(errors,[],'React runtime errors');
+ console.log('React DOM/API: registration redirect, location success/denial/manual fallback, wizard validation/generation, saved trips, completion/review/edit/delete, admin CRUD/status and filters passed. Map and browser rendering remain untested.');
+})().finally(async()=>{
+ if(root)root.unmount();if(vite)await vite.close();
+ php("$db=Database::getInstance()->getConnection(); $db->prepare('DELETE FROM users WHERE email=?')->execute([$argv[2]]); $db->prepare('DELETE FROM destinations WHERE name=?')->execute([$argv[3]]); $db->exec('UPDATE destinations d SET avg_rating=COALESCE((SELECT ROUND(AVG(r.rating),2) FROM reviews r WHERE r.destination_id=d.id),0),total_reviews=(SELECT COUNT(*) FROM reviews r WHERE r.destination_id=d.id)');",email,custom);
+ dom.window.close();
+}).catch(e=>{console.error(e);process.exit(1)});

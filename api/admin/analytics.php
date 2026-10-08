@@ -1,45 +1,36 @@
 <?php
-/**
- * YatraPath API - Admin Analytics Aggregation Endpoint
- */
 declare(strict_types=1);
-
-require_once __DIR__ . '/../../config/session.php';
-require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../config/cors.php';
-require_once __DIR__ . '/../../config/response.php';
-
-requireAdmin(true);
-
+require_once __DIR__ . '/../../config/api.php';
+apiRequest(['GET'], 'admin');
 try {
     $db = Database::getInstance()->getConnection();
 
     // 1. Top generated destinations
     $destStmt = $db->query("
-        SELECT d.name, COUNT(id.id) as count 
-        FROM itin_days id 
-        JOIN destinations d ON id.destination_id = d.id 
-        GROUP BY d.id 
-        ORDER BY count DESC 
+        SELECT d.name, COUNT(DISTINCT id.itinerary_id) as count
+        FROM itin_days id
+        JOIN destinations d ON id.destination_id = d.id
+        GROUP BY d.id, d.name
+        ORDER BY count DESC
         LIMIT 10
     ");
     $topDestinations = $destStmt->fetchAll();
 
     // 2. Budget tier breakdown
     $budgetStmt = $db->query("
-        SELECT 
-            SUM(CASE WHEN total_budget < 15000 THEN 1 ELSE 0 END) as budget,
-            SUM(CASE WHEN total_budget BETWEEN 15000 AND 50000 THEN 1 ELSE 0 END) as mid_range,
-            SUM(CASE WHEN total_budget > 50000 THEN 1 ELSE 0 END) as luxury
+        SELECT
+            SUM(CASE WHEN total_budget / total_days < 3500 THEN 1 ELSE 0 END) as budget,
+            SUM(CASE WHEN total_budget / total_days BETWEEN 3500 AND 10000 THEN 1 ELSE 0 END) as mid_range,
+            SUM(CASE WHEN total_budget / total_days > 10000 THEN 1 ELSE 0 END) as luxury
         FROM itineraries
     ");
     $budgetTiers = $budgetStmt->fetch();
 
     // 3. Category distribution
     $catStmt = $db->query("
-        SELECT category, COUNT(*) as count 
-        FROM activities 
-        GROUP BY category 
+        SELECT category, COUNT(*) as count
+        FROM activities
+        GROUP BY category
         ORDER BY count DESC
     ");
     $categoryDistribution = $catStmt->fetchAll();
@@ -57,13 +48,13 @@ try {
         'metrics'               => $metrics,
         'top_destinations'      => $topDestinations,
         'budget_tiers'          => [
-            ['name' => 'Budget (< NPR 15k)', 'value' => (int)($budgetTiers['budget'] ?? 0)],
-            ['name' => 'Mid-Range (15k-50k)', 'value' => (int)($budgetTiers['mid_range'] ?? 0)],
-            ['name' => 'Luxury (> 50k)', 'value' => (int)($budgetTiers['luxury'] ?? 0)]
+            ['name' => 'Budget (< NPR 3,500/day)', 'value' => (int)($budgetTiers['budget'] ?? 0)],
+            ['name' => 'Mid-Range (3,500–10,000/day)', 'value' => (int)($budgetTiers['mid_range'] ?? 0)],
+            ['name' => 'Luxury (> 10,000/day)', 'value' => (int)($budgetTiers['luxury'] ?? 0)]
         ],
         'category_distribution' => $categoryDistribution
     ], 'Analytics data retrieved');
 
 } catch (Throwable $e) {
-    jsonError('Failed to fetch analytics: ' . $e->getMessage(), 500);
+    throw $e;
 }

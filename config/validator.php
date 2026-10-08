@@ -1,42 +1,31 @@
 <?php
-/**
- * YatraPath - Validation & Sanitization Helpers
- */
 declare(strict_types=1);
-
 class Validator {
-    public static function sanitizeString(?string $val): string {
-        return htmlspecialchars(trim($val ?? ''), ENT_QUOTES, 'UTF-8');
+    public const REGIONS = ['Himalayan', 'Hilly', 'Terai'];
+    public const SEASONS = ['Spring', 'Summer', 'Autumn', 'Winter'];
+    public const CATEGORIES = ['adventure', 'cultural', 'nature', 'food', 'wellness', 'photography'];
+    public static function text(mixed $value, string $name, int $min = 1, int $max = 200): string {
+        if (!is_string($value)) throw new InvalidArgumentException("{$name} must be text.");
+        $value = trim($value);
+        if (mb_strlen($value) < $min || mb_strlen($value) > $max) throw new InvalidArgumentException("{$name} must contain {$min}–{$max} characters.");
+        return $value;
     }
-
-    public static function isValidEmail(string $email): bool {
-        return (bool)filter_var(trim($email), FILTER_VALIDATE_EMAIL);
+    public static function number(mixed $value, string $name, float $min, float $max): float {
+        if (!is_numeric($value) || !is_finite((float)$value) || (float)$value < $min || (float)$value > $max) throw new InvalidArgumentException("{$name} must be between {$min} and {$max}.");
+        return (float)$value;
     }
-
-    public static function isMinLength(string $val, int $min): bool {
-        return mb_strlen(trim($val)) >= $min;
+    public static function choice(mixed $value, array $choices, string $name): string {
+        if (!is_string($value) || !in_array($value, $choices, true)) throw new InvalidArgumentException("Choose a valid {$name}.");
+        return $value;
     }
-
-    public static function isPositiveNumber(mixed $val): bool {
-        return is_numeric($val) && (float)$val > 0;
+    public static function seasons(mixed $value): string {
+        if (is_string($value)) $value = array_map('trim', explode(',', $value));
+        if (!is_array($value) || !$value) throw new InvalidArgumentException('Choose at least one season.');
+        return implode(',', array_unique(array_map(fn($s) => self::choice($s, self::SEASONS, 'season'), $value)));
     }
-
-    public static function isValidDate(string $dateStr, string $format = 'Y-m-d'): bool {
-        $d = DateTime::createFromFormat($format, trim($dateStr));
-        return $d && $d->format($format) === trim($dateStr);
-    }
-
-    public static function sanitizeArray(array $arr): array {
-        $clean = [];
-        foreach ($arr as $key => $val) {
-            if (is_array($val)) {
-                $clean[$key] = self::sanitizeArray($val);
-            } elseif (is_string($val)) {
-                $clean[$key] = self::sanitizeString($val);
-            } else {
-                $clean[$key] = $val;
-            }
-        }
-        return $clean;
-    }
+    public static function sanitizeString(?string $value): string { return trim($value ?? ''); }
+    public static function isValidEmail(string $value): bool { return filter_var($value, FILTER_VALIDATE_EMAIL) !== false; }
+    public static function isMinLength(string $value, int $min): bool { return mb_strlen($value) >= $min; }
+    public static function isPositiveNumber(mixed $value): bool { return is_numeric($value) && (float)$value > 0; }
+    public static function isValidDate(string $value, string $format = 'Y-m-d'): bool { $date = DateTimeImmutable::createFromFormat('!' . $format, $value); return $date && $date->format($format) === $value; }
 }

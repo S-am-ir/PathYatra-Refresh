@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import { formatNPR } from './formatters.js';
 import { normalizeItinerary } from './itinerary.js';
 
-export function generateItineraryPDF(rawPlan, travelerName = 'Traveler') {
+export function generateItineraryPDF(rawPlan, travelerName = 'Traveler', { download = true } = {}) {
   const plan = normalizeItinerary(rawPlan);
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
   const width = doc.internal.pageSize.getWidth();
@@ -46,7 +46,7 @@ export function generateItineraryPDF(rawPlan, travelerName = 'Traveler') {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5); doc.setTextColor(65, 76, 67);
     for (const name of ['morning', 'afternoon', 'evening']) {
       const slot = day.slots?.[name];
-      const line = `${name[0].toUpperCase() + name.slice(1)}: ${slot?.activity || 'Free time'}  |  ${formatNPR(slot?.cost || 0)}`;
+      const line = `${name[0].toUpperCase() + name.slice(1)}: ${slot?.activity || 'Free time'}  |  ${slot?.duration || 0} h  |  ${formatNPR(slot?.cost || 0)}`;
       const rows = doc.splitTextToSize(line, textWidth - 5);
       nextPage(rows.length * 5 + 2);
       doc.text(rows, margin + 3, y); y += rows.length * 5 + 2;
@@ -59,11 +59,16 @@ export function generateItineraryPDF(rawPlan, travelerName = 'Traveler') {
   nextPage(16);
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(115, 110, 97);
   doc.text(doc.splitTextToSize('Planning estimates only. Transport, meals, live hotel prices, availability and road conditions are not included. Confirm before travel.', textWidth), margin, y);
+  if (plan.travel_note) {
+    const note = doc.splitTextToSize(plan.travel_note, textWidth); nextPage(note.length * 4 + 12); y += 10; doc.text(note, margin, y); y += note.length * 4;
+  }
+  for (const warning of plan.warnings || []) { const lines = doc.splitTextToSize(warning, textWidth); nextPage(lines.length * 4 + 6); y += 6; doc.text(lines, margin, y); y += lines.length * 4; }
   const pageCount = doc.internal.getNumberOfPages();
   for (let page = 1; page <= pageCount; page++) {
     doc.setPage(page); doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(126, 137, 125);
     doc.text(`PathYatra | ${page} / ${pageCount}`, width / 2, height - 10, { align: 'center' });
   }
   const filename = (plan.title || 'Itinerary').replace(/[^a-zA-Z0-9]+/g, '_').slice(0, 60);
-  doc.save(`PathYatra_${filename}_${plan.start_date || 'Plan'}.pdf`);
+  if (download) doc.save(`PathYatra_${filename}_${plan.start_date || 'Plan'}.pdf`);
+  return doc;
 }

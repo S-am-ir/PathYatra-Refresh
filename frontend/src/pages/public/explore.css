@@ -22,3 +22,5 @@
 .explore-card > a { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-top: 1.1rem; margin-top: 1.1rem; border-top: 1px solid #d8d0c1; color: #315543; font-size: .82rem; font-weight: 700; }
 .explore-card > a:hover { color: #9b6538; }
 @media (max-width: 700px) { .explore-grid { grid-template-columns: 1fr; } .explore-filter { grid-template-columns: 1fr; } .explore-card { min-height: 320px; } }
+.explore-filter { grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); gap: .75rem; }
+.explore-filter label { min-width: 0; }

@@ -10,3 +10,14 @@
 .admin-chart h2 { font: 400 clamp(1.8rem,3vw,2.6rem) var(--font-display); margin: .5rem 0 1.5rem; }
 .admin-chart__plot { width: 100%; height: 320px; }
 @media (max-width: 750px) { .admin-metrics { grid-template-columns: repeat(2,1fr); } .admin-metrics > div { border-bottom: 1px solid #cfd6c9; } }
+.admin-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 1rem; margin: 1.5rem 0; }
+.admin-toolbar label, .admin-form label { display: flex; flex-direction: column; gap: .5rem; }
+.admin-form { padding: 1.5rem; border: 1px solid #d8dfd0; margin-bottom: 2rem; background: #fffdf6; }
+.admin-form input, .admin-form select, .admin-form textarea, .admin-toolbar input, .admin-toolbar select { padding: .75rem; background: white; border: 1px solid #c5cfbe; border-radius: 4px; color: #1b382e; width: 100%; }
+.admin-seasons { display: flex; flex-wrap: wrap; gap: 1rem; border: 0; padding: 1rem 0; }
+.admin-seasons label { flex-direction: row; align-items: center; }
+.admin-seasons input { width: auto; }
+.admin-table-wrap { overflow-x: auto; }
+.admin-table { width: 100%; border-collapse: collapse; }
+.admin-table th, .admin-table td { padding: .85rem; text-align: left; border-bottom: 1px solid #d8dfd0; }
+.admin-table button { margin-right: .75rem; text-decoration: underline; }

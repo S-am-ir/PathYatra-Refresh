@@ -1,31 +1,9 @@
 <?php
-/**
- * YatraPath API - Mark Itinerary as Completed
- */
 declare(strict_types=1);
-
-require_once __DIR__ . '/../../config/session.php';
-require_once __DIR__ . '/../../config/database.php';
-require_once __DIR__ . '/../../config/cors.php';
-require_once __DIR__ . '/../../config/response.php';
-
-requireLogin(true);
-
-$input = getJsonInput();
-$id = (int)($input['id'] ?? 0);
-$userId = getCurrentUserId();
-
-if ($id <= 0) {
-    jsonError('Valid itinerary ID is required.', 400);
-}
-
-try {
-    $db = Database::getInstance()->getConnection();
-    $stmt = $db->prepare("UPDATE itineraries SET status = 'completed' WHERE id = ? AND user_id = ?");
-    $stmt->execute([$id, $userId]);
-
-    jsonSuccess(null, 'Trip marked as completed');
-
-} catch (Throwable $e) {
-    jsonError('Failed to update trip status: ' . $e->getMessage(), 500);
-}
+require_once __DIR__ . '/../../config/api.php';
+$input = apiRequest(['POST'], 'traveler'); $id = positiveId($input['id'] ?? null);
+$q = db()->prepare('SELECT id, end_date FROM itineraries WHERE id = ? AND user_id = ?'); $q->execute([$id, getCurrentUserId()]);
+$trip = $q->fetch(); if (!$trip) jsonError('This itinerary was not found.', 404);
+if ($trip['end_date'] > date('Y-m-d')) jsonError('You can mark a trip complete once its final travel date has arrived.', 422);
+$q = db()->prepare("UPDATE itineraries SET status = 'completed' WHERE id = ? AND user_id = ?"); $q->execute([$id, getCurrentUserId()]);
+jsonSuccess(null, 'Trip marked complete. You can now review the destinations you visited.');

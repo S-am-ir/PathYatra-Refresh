@@ -10,6 +10,9 @@ vendor/
 # Builds
 frontend/dist/
 frontend/build/
+frontend/test-results/
+frontend/playwright-report/
+verification-artifacts/
 
 # Uploads & Temp
 uploads/*

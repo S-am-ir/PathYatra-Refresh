@@ -19,14 +19,15 @@ function FitRoute({ points }) {
   return null;
 }
 
-function RouteMap({ destinations }) {
+function RouteMap({ destinations, origin }) {
   const mappedStops = destinations.map((stop) => ({ stop, point: [Number(stop.latitude), Number(stop.longitude)] }))
     .filter(({ stop, point: [lat, lng] }) => stop.latitude != null && stop.longitude != null && Number.isFinite(lat) && Number.isFinite(lng));
-  const points = mappedStops.map(({ point }) => point);
+  const points = [...(origin ? [[Number(origin.latitude), Number(origin.longitude)]] : []), ...mappedStops.map(({ point }) => point)];
   if (!points.length) return null;
   return <div className="result-map">
     <MapContainer center={points[0]} zoom={7} scrollWheelZoom={false} className="result-map__canvas">
       <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+      {origin && <CircleMarker center={points[0]} radius={7} pathOptions={{ color: '#ad7646' }}><Tooltip>{origin.label}</Tooltip></CircleMarker>}
       {points.length > 1 && <Polyline positions={points} pathOptions={{ color: '#ad7646', weight: 3, dashArray: '7 7' }} />}
       {mappedStops.map(({ point, stop }, index) => <CircleMarker key={stop.id || index} center={point} radius={8} pathOptions={{ color: '#f7f1e6', weight: 2, fillColor: '#1b382e', fillOpacity: 1 }}>
         <Tooltip direction="top" offset={[0, -7]}>{index + 1}. {stop.name}</Tooltip>
@@ -66,7 +67,7 @@ export default function ItineraryResult() {
     if (!user) { navigate('/login', { state: { from: location } }); return; }
     setSaving(true); setError('');
     try {
-      const res = await api.post('/itinerary/save.php', plan);
+      const res = await api.post('/itinerary/save.php', { plan_token: plan.plan_token });
       if (!res.success) throw new Error(res.message || 'Could not save the plan.');
       setSavedId(res.data.itinerary_id);
     } catch (err) { setError(err.message || 'Could not save the plan.'); }
@@ -96,6 +97,9 @@ export default function ItineraryResult() {
     </div>
     <p className="result-caveat">Planning estimates only. Transport, meals, live hotel prices, and availability are not included. Confirm conditions before travel.</p>
     {plan.weather_advisory && <div className="result-advisory"><span>Season note</span><p>{plan.weather_advisory}</p></div>}
+    {plan.travel_note && <div className="planner-note">{plan.travel_note}</div>}
+    {plan.warnings?.map((warning) => <p className="planner-note" key={warning}>{warning}</p>)}
+    {plan.status === 'completed' && <div className="planner-note">Your trip is complete. Review a visited destination: {stops.map((stop) => <Link key={stop.id} to={`/destinations/${stop.id}`}>{stop.name} · </Link>)}</div>}
     <div className="result-layout">
       <section className="result-days" aria-label="Day by day itinerary">
         <div className="result-section-heading"><span className="eyebrow">Day by day</span><h2>The outline.</h2></div>
@@ -109,7 +113,7 @@ export default function ItineraryResult() {
         </article>)}
       </section>
       <aside className="result-route"><div className="result-route__heading"><MapPin size={18} /><div><span className="eyebrow">The route</span><h2>Your stops.</h2></div></div>
-        <RouteMap destinations={stops} />
+        <RouteMap destinations={stops} origin={plan.origin} />
         <ol>{stops.map((stop, index) => <li key={stop.id || index}><span>{String(index + 1).padStart(2, '0')}</span>{stop.name}</li>)}</ol>
         {!stops.length && <p>Route coordinates are unavailable for this saved plan.</p>}
       </aside>

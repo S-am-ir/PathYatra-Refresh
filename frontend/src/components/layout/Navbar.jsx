@@ -8,6 +8,7 @@ export default function Navbar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -18,8 +19,7 @@ export default function Navbar() {
 
   const signOut = async () => {
     setMenuOpen(false);
-    await logout();
-    navigate('/');
+    try { await logout(); navigate('/'); setError(''); } catch (err) { setError(err.message); }
   };
   const closeMenu = () => setMenuOpen(false);
 
@@ -47,6 +47,7 @@ export default function Navbar() {
           {menuOpen ? <X size={25} /> : <Menu size={25} />}
         </button>
       </div>
+      {error && <p className="travel-error" role="alert">{error}</p>}
     </header>
   );
 }

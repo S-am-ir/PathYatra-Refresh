@@ -17,6 +17,8 @@ const ItineraryResult = lazy(() => import('./pages/user/ItineraryResult'));
 const UserDashboard = lazy(() => import('./pages/user/UserDashboard'));
 const MyItineraries = lazy(() => import('./pages/user/MyItineraries'));
 const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const DestinationDetail = lazy(() => import('./pages/public/DestinationDetail'));
+const AdminCatalog = lazy(() => import('./pages/admin/AdminCatalog'));
 const NotFound = lazy(() => import('./pages/public/NotFound'));
 
 function AnimatedRoutes() {
@@ -28,9 +30,11 @@ function AnimatedRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/destinations" element={<DestinationsExplorer />} />
-        <Route path="/generator" element={<GeneratorPage />} />
-        <Route path="/itinerary-result" element={<ItineraryResult />} />
+        <Route path="/generator" element={<ProtectedRoute><GeneratorPage /></ProtectedRoute>} />
+        <Route path="/itinerary-result" element={<ProtectedRoute><ItineraryResult /></ProtectedRoute>} />
 
+        <Route path="/destinations/:id" element={<DestinationDetail />} />
+        <Route path="/admin/:section" element={<ProtectedRoute adminOnly><AdminCatalog /></ProtectedRoute>} />
         {/* Protected Traveler Routes */}
         <Route
           path="/dashboard"

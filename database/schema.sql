@@ -6,18 +6,8 @@
 CREATE DATABASE IF NOT EXISTS `yatra_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `yatra_db`;
 
-SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS `reviews`;
-DROP TABLE IF EXISTS `itin_slots`;
-DROP TABLE IF EXISTS `itin_days`;
-DROP TABLE IF EXISTS `itineraries`;
-DROP TABLE IF EXISTS `activities`;
-DROP TABLE IF EXISTS `destinations`;
-DROP TABLE IF EXISTS `users`;
-SET FOREIGN_KEY_CHECKS = 1;
-
 -- 1. Users Table
-CREATE TABLE `users` (
+CREATE TABLE IF NOT EXISTS `users` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `name` VARCHAR(100) NOT NULL,
     `email` VARCHAR(150) NOT NULL UNIQUE,
@@ -31,7 +21,7 @@ CREATE TABLE `users` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 2. Destinations Table
-CREATE TABLE `destinations` (
+CREATE TABLE IF NOT EXISTS `destinations` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `name` VARCHAR(150) NOT NULL,
     `region` ENUM('Himalayan', 'Hilly', 'Terai') NOT NULL,
@@ -41,7 +31,7 @@ CREATE TABLE `destinations` (
     `latitude` DECIMAL(10,7) NOT NULL,
     `longitude` DECIMAL(10,7) NOT NULL,
     `image_url` VARCHAR(255) DEFAULT NULL,
-    `avg_rating` DECIMAL(3,2) NOT NULL DEFAULT 5.00,
+    `avg_rating` DECIMAL(3,2) NOT NULL DEFAULT 0.00,
     `total_reviews` INT NOT NULL DEFAULT 0,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -50,7 +40,7 @@ CREATE TABLE `destinations` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 3. Activities Table
-CREATE TABLE `activities` (
+CREATE TABLE IF NOT EXISTS `activities` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `destination_id` INT NOT NULL,
     `name` VARCHAR(150) NOT NULL,
@@ -69,7 +59,7 @@ CREATE TABLE `activities` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 4. Itineraries Table
-CREATE TABLE `itineraries` (
+CREATE TABLE IF NOT EXISTS `itineraries` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `user_id` INT NOT NULL,
     `title` VARCHAR(200) NOT NULL,
@@ -81,6 +71,8 @@ CREATE TABLE `itineraries` (
     `season` VARCHAR(50) NOT NULL,
     `status` ENUM('planned', 'completed') NOT NULL DEFAULT 'planned',
     `share_token` VARCHAR(64) DEFAULT NULL UNIQUE,
+    `plan_token` VARCHAR(64) DEFAULT NULL UNIQUE,
+    `plan_json` JSON DEFAULT NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     CONSTRAINT `fk_itineraries_user`
@@ -91,7 +83,7 @@ CREATE TABLE `itineraries` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 5. Itinerary Days Table
-CREATE TABLE `itin_days` (
+CREATE TABLE IF NOT EXISTS `itin_days` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `itinerary_id` INT NOT NULL,
     `day_number` INT NOT NULL,
@@ -111,7 +103,7 @@ CREATE TABLE `itin_days` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 6. Itinerary Activity Slots Table
-CREATE TABLE `itin_slots` (
+CREATE TABLE IF NOT EXISTS `itin_slots` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `itin_day_id` INT NOT NULL,
     `slot_name` ENUM('morning', 'afternoon', 'evening') NOT NULL,
@@ -129,7 +121,7 @@ CREATE TABLE `itin_slots` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- 7. Reviews Table
-CREATE TABLE `reviews` (
+CREATE TABLE IF NOT EXISTS `reviews` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `user_id` INT NOT NULL,
     `destination_id` INT NOT NULL,
@@ -144,5 +136,17 @@ CREATE TABLE `reviews` (
         FOREIGN KEY (`destination_id`) REFERENCES `destinations` (`id`)
         ON DELETE CASCADE ON UPDATE CASCADE,
     INDEX `idx_reviews_destination` (`destination_id`),
-    INDEX `idx_reviews_user` (`user_id`)
+    INDEX `idx_reviews_user` (`user_id`),
+    UNIQUE KEY `unique_review_author_destination` (`user_id`, `destination_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS accommodation_tiers (
+    id INT PRIMARY KEY, name VARCHAR(30) NOT NULL, min_daily_budget DECIMAL(10,2) NOT NULL,
+    nightly_cost DECIMAL(10,2) NOT NULL, description VARCHAR(150) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS season_advisories (
+    season VARCHAR(20) PRIMARY KEY, advisory TEXT NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS schema_migrations (
+    version VARCHAR(40) PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;

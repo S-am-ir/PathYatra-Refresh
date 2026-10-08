@@ -1,24 +1,85 @@
 # PathYatra
 
-PathYatra is a Nepal itinerary planning prototype. The React interface is in `frontend/`; PHP endpoints are in `api/`; MySQL schema and initial catalog are in `database/`. This refreshed version is based on the original [Dokr101/PathYatra](https://github.com/Dokr101/PathYatra) project.
+A Nepal trip planner built with React/Vite, PHP REST endpoints and MariaDB. Based on [Dokr101/PathYatra](https://github.com/Dokr101/PathYatra), this version completes the traveler and admin flows described in the proposal.
 
-The planner filters activities by a month-based season, ranks activity categories against traveler interests, orders selected destinations with a Haversine nearest-neighbor heuristic, and fills morning, afternoon, and evening slots within an estimated activity allowance. The route lines are straight connections between destination coordinates, not road directions. Accommodation uses price tiers rather than live hotel inventory.
+## Run with Docker
 
-## Run locally
+Install Docker Desktop (or Docker Engine with Compose). No separate PHP, MySQL or Node installation is needed.
 
-Requirements: PHP 8+ with `pdo_mysql`, MySQL 8 or MariaDB 10+, Node.js and npm. Run the PHP server and Vite on the same computer; the frontend proxies its API calls to PHP.
+```sh
+git clone https://github.com/S-am-ir/PathYatra-Refresh.git
+cd PathYatra-Refresh
+docker compose up --build -d
+```
 
-1. Clone this repository. Import `database/schema.sql` and then `database/seed.sql` into MySQL, for example with `mysql -u root -p < database/schema.sql` followed by `mysql -u root -p < database/seed.sql`. The schema creates the `yatra_db` database. The seed contains a small sample catalog and demo accounts.
-2. From the repository root, start PHP in one terminal: `php -S 127.0.0.1:8001 -t .`. Database defaults are `127.0.0.1`, `yatra_db`, `root`, and an empty password. Set `DB_HOST`, `DB_NAME`, `DB_USER`, and `DB_PASS` in the PHP server's environment if yours differ.
-3. From `frontend/`, run `npm ci`, then `npm run dev`. The API proxy and development admin links default to `http://127.0.0.1:8001`.
-4. Open **`http://localhost:5180`** for the refreshed React interface. Browse destinations, create a plan, register an account, then save and reopen the plan. The PHP server at port 8001 serves the API and separate legacy pages; opening its root URL shows the older PHP homepage.
+Open **http://localhost:5180**. Initial image downloads and building can take a few minutes. `docker compose ps` shows readiness; `docker compose logs init api web` shows startup errors. The database starts first, the migration runs next, and the app starts after that. The API and database ports are internal to Docker; the browser uses one origin.
 
-Vite uses port 5180 strictly: if it is occupied, startup fails with a clear error instead of moving to another port. Stop any existing process on that port and start Vite from this repository's `frontend/` directory. If you previously set `PATHYATRA_PHP_URL` or `VITE_PHP_BASE_URL`, remove the old values or change both to `http://127.0.0.1:8001`, then restart Vite.
+Demo accounts (created only if their email does not already exist):
 
-If using XAMPP instead, put this refreshed project under Apache's document root and point `PATHYATRA_PHP_URL` and `VITE_PHP_BASE_URL` to its actual PHP URL, such as `http://localhost/PathYatra-Refresh`. Continue to open port 5180 for the React interface. `npm run preview` uses port 4180 for inspecting a production build; it does not configure the PHP API proxy.
+| Role | Email | Password |
+| --- | --- | --- |
+| Admin | admin@yatra.com | Admin@123 |
+| Traveler | traveler@yatra.com | Traveler@123 |
 
-See [the frontend guide](frontend/README.md) for the interface and deployment notes.
+You can also register a traveler. These accounts are for local demonstration; change their credentials and database passwords before public hosting.
 
-## Current boundaries
+To change the port, copy `.env.example` to `.env`, set `APP_PORT` (for example `5181`), then run `docker compose up --build -d` again. Open that port, including from another device using the host's LAN IP. The selected port and existing database survive app rebuilds. `docker compose down` stops the stack and preserves data. `docker compose down -v` **deletes the database**.
 
-The React experience is the primary traveler interface. The repository also includes older PHP-rendered pages, including admin catalog screens. They remain separate from the React styling. The initial catalog contains five destinations and 26 activities; it can grow through database/admin updates. Budget figures exclude transport, meals, live lodging prices, and availability. The illustrated website scenery is not a verified photo of a named location.
+Current location is requested by the planner's **Use my current location** button. Browsers require permission and HTTPS, except on localhost. A phone opening a plain HTTP LAN address may reject location; choose a starting place instead, or use HTTPS. Location sets the initial nearest stop, and is stored with a plan only if you save that plan. Travel to the first stop is not scheduled.
+
+## Working flows
+
+- Register/sign in; role-protected admin access; deactivated accounts lose access.
+- Browse/search destinations; region, season, daily estimate and activity category filters; activities and reviews per destination.
+- Four-step trip planning with optional current/manual origin, dates, budget and interests.
+- Save, reopen, download PDF, complete on or after the final trip date, and delete owned trips.
+- Review a destination from a completed trip; update your own review; averages reflect actual reviews.
+- Admin destination/activity CRUD, traveler status and analytics from the live database.
+- Fresh seed: 25 destinations, 104 activities; editable records and no fabricated reviews.
+
+## Algorithms and limits
+
+The proposal's algorithms remain: month-to-season classification, season filtering, category interest scoring (+10 for a match), budget allocation and accommodation tiers, Haversine distance with nearest-neighbor destination ordering, and greedy morning/afternoon/evening scheduling. The first selected destination starts the route unless an origin is supplied. Ties are resolved deterministically by cost and activity ID.
+
+Scheduling now respects slot capacities (4 / 4 / 3 hours), spans longer activities over morning and afternoon, never repeats an activity, and stays within the daily and total accommodation/activity allowances. Season filtering uses each day's date, including trips across season boundaries. Unfilled slots remain free time.
+
+Intercity transfers use an explicit scheduling heuristic: straight-line distance × 1.5 ÷ 35 km/h, rounded up to a quarter hour. Legs over four hours reserve whole transfer days of up to eight hours each. Shorter transfers occupy the morning. Insufficient trip length returns an explanation instead of an impossible sightseeing plan. **This is not a road route or a live journey-time estimate.** The map's lines are straight connections. Arrival travel, transport fares, meals, permits, live hotels, road conditions and booking availability are outside the model; unallocated budget remains visible for those expenses. See [catalog notes](docs/CATALOG.md).
+
+The browser cannot set saved prices or activities: saving uses a server-generated token and snapshot, valid for 12 hours within the signed-in session (up to ten recent candidates). Duplicate saves return the same trip. Older saved plans are supported by a compatibility reader. Catalog deletion preserves saved snapshots but removes the deleted destination's review eligibility.
+
+## Verification
+
+Against a local/test installation:
+
+```sh
+docker compose --profile test run --rm test
+```
+
+See [verification results and limits](docs/VERIFICATION.md).
+
+The prepared `Docker and browser verification` GitHub Actions workflow adds real Chromium checks for desktop/mobile flows, live map tiles, PDF downloads and data surviving container recreation. Its reports include screenshots and container logs. See the verification document for the equivalent local commands and the checks that have actually run.
+
+This runs scheduler invariant tests and HTTP/database flow tests. Integration tests create uniquely named temporary travelers/catalog records and remove them afterward. Use a disposable or local database, not a live deployment.
+
+## Run without Docker
+
+Requirements: PHP 8.3+ with `pdo_mysql` and `mbstring`, MariaDB 10.11+ or MySQL 8+, Node 22+.
+
+Create `yatra_db` with UTF-8, set `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASS` as needed, then:
+
+```sh
+php database/migrate.php
+php -S 127.0.0.1:8001 router.php
+```
+
+In another terminal:
+
+```sh
+cd frontend
+npm ci
+npm run dev
+```
+
+Open http://localhost:5180. `PATHYATRA_PHP_URL` can change the Vite proxy target. `npm run build` builds the frontend; production serving needs the SPA fallback and `/api` proxy provided by the Docker Nginx configuration. PHP's port is an API service, not the interface. The old duplicate PHP pages have been removed.
+
+For an existing original database, **back it up first**, then run `php database/migrate.php` using its connection settings. The migration adds snapshot/token fields and review uniqueness, preserves users/trips/catalog edits, and keeps the newest duplicate review per author/destination. The migration is repeatable. Importing only `seed.sql` manually does not record its migration version; prefer the migration command.
