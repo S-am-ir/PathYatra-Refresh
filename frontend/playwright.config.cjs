@@ -11,6 +11,8 @@ module.exports = defineConfig({
     baseURL: process.env.TEST_WEB_URL || 'http://127.0.0.1:5180',
     viewport: { width: 1440, height: 1000 },
     browserName: 'chromium',
+    actionTimeout: 15000,
+    navigationTimeout: 30000,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },

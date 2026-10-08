@@ -145,7 +145,7 @@ test('desktop: actual catalog, location, itinerary, map, PDF, persistence, revie
       await page.getByLabel('Your experience').fill('The completed itinerary was useful for planning our visit.');
       await page.getByRole('button', { name: 'Save review', exact: true }).click();
       await expect(page.getByText('Your review has been saved.', { exact: true })).toBeVisible();
-      await page.getByLabel('Rating', { exact: true }).selectOption('4');
+      await page.getByLabel('Rating').selectOption('4');
       await page.getByRole('button', { name: 'Save review', exact: true }).click();
       await expect(page.getByText('4.00 / 5 from 1 traveler reviews', { exact: false })).toBeVisible();
       await page.goto('/my-itineraries');
@@ -174,7 +174,7 @@ test('desktop: actual catalog, location, itinerary, map, PDF, persistence, revie
       await page.goto('/admin/activities');
       await page.getByRole('button', { name: 'Add activity', exact: true }).click();
       await page.getByLabel('Name', { exact: true }).fill(`Browser activity ${tag}`);
-      await page.locator('form').getByLabel('Destination', { exact: true }).selectOption({ label: customName });
+      await page.locator('form').getByLabel('Destination').selectOption({ label: customName });
       await page.getByRole('button', { name: 'Save record' }).click();
       await expect(page.getByText('Record created.', { exact: true })).toBeVisible();
       await page.getByLabel('Search', { exact: true }).fill(`Browser activity ${tag}`);
