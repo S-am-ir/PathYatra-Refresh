@@ -1,11 +1,11 @@
 # Functional verification
 
-Checked in this workspace and on a GitHub-hosted Ubuntu 24.04 runner on 2026-10-08, using PHP 8.3, MariaDB 10.11 and the React/Vite code. The actual Docker/Chromium checks passed for commit `2e7b11775cb20d63190c0857a1b67cf02757983c`: [successful run](https://github.com/S-am-ir/PathYatra-Refresh/actions/runs/37763578876). These results describe this revision, not a guarantee that every possible environment or input is issue-free.
+Checked in this workspace and on a GitHub-hosted Ubuntu 24.04 runner on 2026-10-08, using PHP 8.3, MariaDB 10.11 and the React/Vite code. The expanded Docker/Chromium audit passed for commit `375dc31a4ac4e5579a07a6813420377b796f255e`: [successful run](https://github.com/S-am-ir/PathYatra-Refresh/actions/runs/37800791013). These results describe this revision, not a guarantee that every possible environment or input is issue-free. See [AUDIT.md](AUDIT.md) for the user journeys, independent algorithm checks and fixes.
 
 | Check | Result |
 | --- | --- |
-| Scheduler tests | 4,269 assertions: season boundaries, origin ordering, Haversine reference cases, transfer days, duration bounds, spanning activities, uniqueness, randomized budgets and summary totals |
-| HTTP/API integration | 52 checks: authentication, CSRF, role/ownership restrictions, catalog filters/CRUD, invalid inputs, generation, trusted/idempotent save, reopening, account deactivation, completion/review eligibility, review edit/averages and deletion |
+| Scheduler tests | 4,293 assertions: four-stop/origin ordering and ties, interest ranking and tie breaks, deterministic output, per-day season changes, tier boundaries, Haversine reference cases, transfer days, duration bounds, spanning activities, uniqueness, randomized budgets and totals |
+| HTTP/API integration | 56 checks: authentication, CSRF, role/ownership restrictions, catalog filters/CRUD, invalid inputs, generation, trusted/idempotent save, reopening, maximum-length destination names on transfer days, account deactivation, completion/reviews, review edit/averages and deletion |
 | Generation timing | Local single-request tests completed in 3–19 ms, below the proposal's three-second target; not a load benchmark |
 | Upgrade from original schema | Users and an older saved trip preserved, newest duplicate review retained, new catalog inserted, repeat migration successful |
 | React forms with real API | Simulated DOM: registration redirects, location success/denial/manual fallback, wizard validation, generation, saved-trip completion/deletion, review editing, admin CRUD/status and combined filters |
@@ -20,6 +20,8 @@ Checked in this workspace and on a GitHub-hosted Ubuntu 24.04 runner on 2026-10-
 | Database persistence | Full Compose teardown/recreation without deleting the volume preserved the registered traveler and exact saved days, map data and budget summary |
 | Alternate published port | Port 5181 served the API health endpoint and the planner SPA route successfully |
 | Browser runtime errors | None during the passing desktop/mobile flows, including zooming and immediately leaving a saved plan |
+| Expanded user audit | Five browser journeys passed: public/account pages, errors and recovery, home prefill through registration, nine independently validated plan scenarios, live admin catalog edits, preserved history after catalog deletion and session revocation |
+| Screenshot/PDF inspection | Inspected desktop/mobile public, traveler and admin screenshots, maps and the final day of a 30-day plan; rendered the two downloaded PDFs and checked final days, dates, budgets and text bounds |
 
 ## Limits of this verification
 
@@ -31,9 +33,9 @@ Run `docker compose up --build -d` and `docker compose --profile test run --rm t
 
 ## Real Docker/browser test runner
 
-The `Docker and browser verification` GitHub Actions workflow **passed**. It builds the actual images, waits for Compose readiness, runs the scheduler/API tests inside Docker, and launches Chromium through Playwright. It retains screenshots, the downloaded PDF, failure traces, an HTML report and container logs for inspection. It also checks an alternate published port and recreates the stack without deleting the database volume to compare the reopened plan with the original snapshot. The passing browser suite completed in 33.1 seconds; the API generation sample took 1 ms.
+The `Docker and browser verification` GitHub Actions workflow **passed**. It builds the actual images, waits for Compose readiness, runs the scheduler/API tests inside Docker, and launches Chromium through Playwright. It retains screenshots, downloaded PDFs, generated-plan JSON, failure traces, an HTML report and container logs for inspection. It also checks an alternate published port and recreates the stack without deleting the database volume to compare the reopened plan with the original snapshot. All five browser journeys passed in 1.1 minutes; the API generation sample took 2 ms.
 
-The [passing run's artifact](https://github.com/S-am-ir/PathYatra-Refresh/actions/runs/37763578876/artifacts/11543133954) includes desktop/mobile screenshots, the PDF and HTML report. GitHub artifacts expire after 14 days; the workflow can be rerun to create fresh evidence.
+The [passing run's artifact](https://github.com/S-am-ir/PathYatra-Refresh/actions/runs/37800791013/artifacts/11561231241) includes 25 desktop/mobile screenshots, two PDFs, generated-plan evidence and the HTML report. GitHub artifacts expire after 14 days; the workflow can be rerun to create fresh evidence.
 
 The browser tests exercise the actual result page and Leaflet SVG markers/route, require successfully downloaded live OpenStreetMap tiles, and check desktop and phone-sized screens. They cover registration, browser geolocation with supplied test coordinates, manual origin after permission denial, generation, saving/reopening, PDF download, completion/reviews, deletion and admin maintenance. Supplied browser coordinates are not a physical GPS test. Tile requests are not mocked; an external tile-service/network failure will fail the map check and must be inspected separately.
 

@@ -59,7 +59,7 @@ docker compose --profile test run --rm test
 
 See [verification results and limits](docs/VERIFICATION.md).
 
-The `Docker and browser verification` GitHub Actions workflow passed actual Docker startup, scheduler/API tests, Chromium desktop/mobile flows, live map tiles, PDF downloads, data surviving container recreation and an alternate published port. [View the passing run](https://github.com/S-am-ir/PathYatra-Refresh/actions/runs/37763578876). Its reports include screenshots and container logs. See the verification document for equivalent local commands and remaining device-specific checks.
+The `Docker and browser verification` GitHub Actions workflow passed actual Docker startup, 4,293 planner assertions, 56 API checks and five Chromium desktop/mobile journeys, including live maps, PDF downloads, catalog changes feeding new plans, saved history surviving catalog deletion, data surviving container recreation and an alternate published port. [View the passing run](https://github.com/S-am-ir/PathYatra-Refresh/actions/runs/37800791013). Its reports include screenshots, generated-plan evidence and container logs. See [the functional audit](docs/AUDIT.md) for findings and algorithm limits, and the verification document for equivalent local commands and remaining device checks.
 
 This runs scheduler invariant tests and HTTP/database flow tests. Integration tests create uniquely named temporary travelers/catalog records and remove them afterward. Use a disposable or local database, not a live deployment.
 
