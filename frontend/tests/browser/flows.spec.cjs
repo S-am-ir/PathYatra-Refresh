@@ -59,7 +59,7 @@ test('desktop: actual catalog, location, itinerary, map, PDF, persistence, revie
   const email = `browser_${tag}@example.com`;
   const customName = `Browser catalog ${tag}`;
   const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
+  page.on('pageerror', error => errors.push(error.stack || error.message));
   await context.setGeolocation({ latitude: 28.2096, longitude: 83.9856 });
   await context.grantPermissions(['geolocation']);
   try {
@@ -133,7 +133,10 @@ test('desktop: actual catalog, location, itinerary, map, PDF, persistence, revie
       });
     }
     await test.step('enforce completion dates, review a completed trip and delete the plan', async () => {
-      await page.goto('/my-itineraries');
+      // Leave immediately after zooming: regression for a callback after map removal.
+      await page.locator('.result-map .leaflet-control-zoom-in').click();
+      await page.locator('.travel-back').click();
+      await expect(page).toHaveURL(/\/my-itineraries$/);
       await page.getByRole('button', { name: 'Mark complete', exact: true }).click();
       await expect(page.getByRole('alert')).toContainText('final travel date');
       fixture('expire', email, id);
@@ -201,7 +204,7 @@ test('mobile: browser location denial, manual origin and full result/map renderi
   const context = await browser.newContext({ baseURL, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
   const page = await context.newPage();
   const errors = [];
-  page.on('pageerror', error => errors.push(error.message));
+  page.on('pageerror', error => errors.push(error.stack || error.message));
   try {
     await login(page, 'traveler@yatra.com', 'Traveler@123');
     await page.goto('/generator');

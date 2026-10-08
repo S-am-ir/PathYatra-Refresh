@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -13,19 +13,20 @@ import './travel.css';
 function FitRoute({ points }) {
   const map = useMap();
   useEffect(() => {
-    if (points.length > 1) map.fitBounds(points, { padding: [38, 38] });
-    else if (points.length) map.setView(points[0], 9);
+    if (points.length > 1) map.fitBounds(points, { padding: [38, 38], animate: false });
+    else if (points.length) map.setView(points[0], 9, { animate: false });
   }, [map, points]);
   return null;
 }
 
 function RouteMap({ destinations, origin }) {
-  const mappedStops = destinations.map((stop) => ({ stop, point: [Number(stop.latitude), Number(stop.longitude)] }))
-    .filter(({ stop, point: [lat, lng] }) => stop.latitude != null && stop.longitude != null && Number.isFinite(lat) && Number.isFinite(lng));
-  const points = [...(origin ? [[Number(origin.latitude), Number(origin.longitude)]] : []), ...mappedStops.map(({ point }) => point)];
+  const mappedStops = useMemo(() => destinations.map((stop) => ({ stop, point: [Number(stop.latitude), Number(stop.longitude)] }))
+    .filter(({ stop, point: [lat, lng] }) => stop.latitude != null && stop.longitude != null && Number.isFinite(lat) && Number.isFinite(lng)), [destinations]);
+  const points = useMemo(() => [...(origin ? [[Number(origin.latitude), Number(origin.longitude)]] : []), ...mappedStops.map(({ point }) => point)], [origin, mappedStops]);
   if (!points.length) return null;
   return <div className="result-map">
-    <MapContainer center={points[0]} zoom={7} scrollWheelZoom={false} className="result-map__canvas">
+    {/* Leaflet 1.9's zoom timer can outlive a removed map during route navigation. */}
+    <MapContainer center={points[0]} zoom={7} zoomAnimation={false} scrollWheelZoom={false} className="result-map__canvas">
       <TileLayer attribution='&copy; OpenStreetMap contributors' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
       {origin && <CircleMarker center={points[0]} radius={7} pathOptions={{ color: '#ad7646' }}><Tooltip>{origin.label}</Tooltip></CircleMarker>}
       {points.length > 1 && <Polyline positions={points} pathOptions={{ color: '#ad7646', weight: 3, dashArray: '7 7' }} />}
