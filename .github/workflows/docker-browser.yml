@@ -57,6 +57,15 @@ jobs:
           mkdir -p verification-artifacts
           docker compose ps --all > verification-artifacts/containers.txt
           docker compose logs --no-color > verification-artifacts/containers.log 2>&1
+          for service in db api web; do
+            container_id=$(docker compose ps -q "$service")
+            if [ -n "$container_id" ]; then
+              docker inspect --format='{{json .State.Health}}' "$container_id" > "verification-artifacts/health-${service}.json"
+            fi
+          done
+          cat verification-artifacts/containers.txt
+          tail -n 60 verification-artifacts/containers.log
+          docker compose exec -T web wget --spider http://localhost/ || true
       - uses: actions/upload-artifact@v6
         if: always()
         with:
