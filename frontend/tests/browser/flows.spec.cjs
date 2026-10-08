@@ -47,11 +47,24 @@ async function assertMap(page) {
   // Two destination markers, an origin marker and a real SVG route line.
   await expect(map.locator('.leaflet-overlay-pane svg path')).toHaveCount(4);
   await expect(map.locator('path[stroke-dasharray="7 7"]')).toBeVisible();
+  const bounds = await map.boundingBox();
+  for (const marker of await map.locator('path:not([stroke-dasharray="7 7"])').all()) {
+    const point = await marker.boundingBox();
+    expect(point.x).toBeGreaterThanOrEqual(bounds.x);
+    expect(point.y).toBeGreaterThanOrEqual(bounds.y);
+    expect(point.x + point.width).toBeLessThanOrEqual(bounds.x + bounds.width);
+    expect(point.y + point.height).toBeLessThanOrEqual(bounds.y + bounds.height);
+  }
   await expect.poll(() => map.locator('img.leaflet-tile').evaluateAll(images =>
     images.filter(img => img.complete && img.naturalWidth > 0).length
   ), { timeout: 30000, message: 'Live OpenStreetMap tiles must actually download; no tile mocks are used.' }).toBeGreaterThan(0);
   await map.locator('.leaflet-control-zoom-in').click();
   await expect(map.locator('path[stroke-dasharray="7 7"]')).toBeVisible();
+  await map.locator('.leaflet-control-zoom-out').click();
+  // Capture the fitted route after tiles finish fading in, rather than a transient zoom frame.
+  await expect.poll(() => map.locator('img.leaflet-tile-loaded').evaluateAll(images =>
+    images.filter(img => img.complete && img.naturalWidth > 0 && Number(getComputedStyle(img).opacity) >= 0.99).length
+  ), { timeout: 30000 }).toBeGreaterThan(0);
 }
 
 test('desktop: actual catalog, location, itinerary, map, PDF, persistence, reviews and admin', async ({ page, context }, testInfo) => {

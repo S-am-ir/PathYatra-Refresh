@@ -36,6 +36,43 @@ check($hike['days'][0]['slots']['afternoon']['cost']===0,'Continuation is not ch
 check($hike['days'][0]['slots']['evening']['activity_id']===null,'Activity cannot repeat');
 $winter = ItineraryPlanner::build(array_replace($hikeInput,['start_date'=>'2027-12-01']),$dest,$long,$tiers,[]);
 check(!$winter['highlights'] && $winter['warnings'],'Excluded seasonal activities cannot become highlights');
+// Hand-calculated outcomes supplement the randomized invariant checks below.
+$line = [];
+foreach ([1=>0,2=>3,3=>1,4=>2] as $id=>$longitude) $line[] = ['id'=>$id,'name'=>'Stop '.$id,'latitude'=>0,'longitude'=>$longitude];
+check(array_column(RouteOptimizer::optimizeRoute($line),'id') === [1,3,4,2], 'Four-stop nearest-neighbor route starts with first selection');
+check(array_column(RouteOptimizer::optimizeRoute($line,['latitude'=>0,'longitude'=>3]),'id') === [2,4,3,1], 'Four-stop nearest-neighbor route starts closest to origin');
+$tied = [['id'=>1,'latitude'=>0,'longitude'=>0],['id'=>2,'latitude'=>0,'longitude'=>1],['id'=>3,'latitude'=>0,'longitude'=>-1]];
+check(array_column(RouteOptimizer::optimizeRoute($tied),'id') === [1,2,3], 'Equal distances preserve selection order');
+$one = array_replace($clean,['destinations'=>[1],'origin'=>null,'days'=>1,'start_date'=>'2027-11-30','budget'=>3000]);
+$ranked = [];
+foreach ([[110,'nature',10],[113,'cultural',100],[112,'cultural',100],[111,'cultural',200]] as [$id,$category,$cost]) $ranked[] = ['id'=>$id,'destination_id'=>1,'name'=>'Rank '.$id,'duration_hours'=>2,'cost_npr'=>$cost,'category'=>$category,'preferred_slot'=>'Morning','suitable_seasons'=>'Autumn,Winter'];
+$rankPlan = ItineraryPlanner::build($one,$dest,$ranked,$tiers,[]);
+check($rankPlan['days'][0]['slots']['morning']['activity_id'] === 112, 'Interest matches outrank cheaper nonmatches; equal match cost breaks by ID');
+check($rankPlan['days'][0]['slots']['afternoon']['activity_id'] === 113, 'Fallback keeps ranking and excludes already-used activity');
+$naturePlan = ItineraryPlanner::build(array_replace($one,['interests'=>['nature']]),$dest,$ranked,$tiers,[]);
+check($naturePlan['days'][0]['slots']['morning']['activity_id'] === 110, 'Changing interests changes the selected activity');
+check($rankPlan === ItineraryPlanner::build($one,$dest,$ranked,$tiers,[]), 'Identical inputs and catalog produce identical plans');
+foreach ([[1500,'Budget',1500],[3499.99,'Budget',1500],[3500,'Mid-Range',3500],[10000,'Mid-Range',3500],[10000.01,'Luxury',8000]] as [$budget,$tier,$stay]) {
+    $boundary = ItineraryPlanner::build(array_replace($one,['budget'=>$budget]),$dest,[],$tiers,[]);
+    check($boundary['budget_summary']['tier'] === $tier, 'Accommodation threshold '.$budget);
+    check($boundary['days'][0]['accommodation']['cost'] == $stay, 'Stay cost at threshold '.$budget);
+}
+$seasonActivities = [
+    ['id'=>201,'destination_id'=>1,'name'=>'Autumn only','duration_hours'=>2,'cost_npr'=>100,'category'=>'cultural','preferred_slot'=>'Morning','suitable_seasons'=>'Autumn'],
+    ['id'=>202,'destination_id'=>1,'name'=>'Winter only','duration_hours'=>2,'cost_npr'=>100,'category'=>'cultural','preferred_slot'=>'Morning','suitable_seasons'=>'Winter']
+];
+$crossing = ItineraryPlanner::build(array_replace($one,['days'=>2,'budget'=>6000]),$dest,$seasonActivities,$tiers,[]);
+check(array_column($crossing['days'],'date') === ['2027-11-30','2027-12-01'], 'Day dates cross the month boundary correctly');
+check(array_column($crossing['days'],'season') === ['Autumn','Winter'], 'Season is recalculated for each travel day');
+check($crossing['days'][0]['slots']['morning']['activity_id'] === 201 && $crossing['days'][1]['slots']['morning']['activity_id'] === 202, 'Activities follow each day season, not only the initial season');
+$seasonDest = $dest;
+$seasonDest[0]['suitable_seasons'] = 'Autumn';
+$warningPlan = ItineraryPlanner::build(array_replace($one,['days'=>2,'budget'=>6000]),$seasonDest,$seasonActivities,$tiers,[]);
+check(count($warningPlan['warnings']) === 1 && str_contains($warningPlan['warnings'][0],'Winter'), 'Destination season warning appears on the affected day');
+$exhausted = ItineraryPlanner::build(array_replace($one,['days'=>30,'budget'=>45000]),$dest,$ranked,$tiers,[]);
+check(count($exhausted['days']) === 30, 'Maximum-length plan has thirty days');
+check($exhausted['budget_summary']['total_estimated'] === 45000, 'Minimum allowance charges only the stay when paid activities cannot fit');
+check($exhausted['days'][29]['slots']['morning']['activity_id'] === null, 'Unavailable activities leave honest free time');
 // Property checks across randomized budgets, durations, categories and available catalog records.
 mt_srand(101);
 for ($run=0;$run<160;$run++) {
