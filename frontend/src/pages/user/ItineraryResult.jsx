@@ -108,7 +108,7 @@ export default function ItineraryResult() {
           <div className="day-card__top"><span className="day-card__number">{String(day.day_number).padStart(2, '0')}</span><div><small>{formatDate(day.date)}</small><h3>{day.destination}</h3></div><strong>{formatNPR(day.day_total)}</strong></div>
           <div className="day-card__slots">{['morning', 'afternoon', 'evening'].map((slotName) => {
             const slot = day.slots?.[slotName];
-            return <div className="day-card__slot" key={slotName}><span>{slotName}</span><div><strong>{slot?.activity || 'Free time'}</strong>{slot?.duration && <small>{slot.duration} hours</small>}</div><span>{slot?.cost ? formatNPR(slot.cost) : 'Free'}</span></div>;
+            return <div className="day-card__slot" key={slotName}><span>{slotName}</span><div><strong>{slot?.activity || 'Free time'}</strong>{Number(slot?.duration) > 0 && <small>{slot.duration} hours</small>}</div><span>{slot?.cost ? formatNPR(slot.cost) : 'Free'}</span></div>;
           })}</div>
           <div className="day-card__stay">Estimated stay <span>{day.accommodation?.name || 'Accommodation estimate'} · {formatNPR(day.accommodation?.cost || 0)}</span></div>
         </article>)}
