@@ -1,6 +1,6 @@
 # Functional verification
 
-Checked in this workspace on 2026-10-08, using PHP 8.3, MariaDB 10.11 and the React/Vite code. These results describe this revision, not a guarantee that every possible environment or input is issue-free.
+Checked in this workspace and on a GitHub-hosted Ubuntu 24.04 runner on 2026-10-08, using PHP 8.3, MariaDB 10.11 and the React/Vite code. The actual Docker/Chromium checks passed for commit `2e7b11775cb20d63190c0857a1b67cf02757983c`: [successful run](https://github.com/S-am-ir/PathYatra-Refresh/actions/runs/37763578876). These results describe this revision, not a guarantee that every possible environment or input is issue-free.
 
 | Check | Result |
 | --- | --- |
@@ -14,16 +14,26 @@ Checked in this workspace on 2026-10-08, using PHP 8.3, MariaDB 10.11 and the Re
 | PHP syntax | All current PHP files passed syntax checks |
 | Database account permissions | Migration succeeded with an account restricted to its application database |
 | Compose configuration | Validated with Docker Compose 2.40; startup dependencies and database health check configured |
+| Actual Docker build/startup | Passed on the GitHub runner: PHP and web images built, a fresh MariaDB volume initialized, migration exited successfully, API/web readiness passed |
+| Actual Chromium desktop | Passed: filters/details, protected registration, supplied browser location, generation, live map tiles/route/zoom, PDF download, save/reload, completion date enforcement, reviews/editing, deletion and admin CRUD/status |
+| Phone-sized Chromium | Passed at 390 × 844: browser location denial, manual origin, generation, live map tiles/route/zoom and no horizontal overflow in planner/result |
+| Database persistence | Full Compose teardown/recreation without deleting the volume preserved the registered traveler and exact saved days, map data and budget summary |
+| Alternate published port | Port 5181 served the API health endpoint and the planner SPA route successfully |
+| Browser runtime errors | None during the passing desktop/mobile flows, including zooming and immediately leaving a saved plan |
 
 ## Limits of this verification
 
-A full Chromium session could not start because the workspace lacks the process filesystem it needs. The simulated DOM tests do not verify screen layout, Leaflet rendering, real device geolocation, permission prompts, or browser download behavior. PDF document creation was checked independently. **A Docker engine is unavailable here, so the actual image build and Compose startup remain unverified.** PHP/MariaDB were run together directly, with the same schema, migration and API tests used by the Compose test service.
+This workspace cannot run Docker or Chromium itself; those checks were completed on the GitHub runner instead. The browser tests use real Chromium, not a simulated DOM, and downloaded live OpenStreetMap tiles. Desktop geolocation uses supplied test coordinates, and the mobile test verifies browser denial/manual fallback. Physical GPS hardware, a person's interactive permission prompt, Safari/Firefox and other operating systems remain local/device checks. The mobile run is a phone-sized Chromium viewport, not a physical phone. Generation timing is a single-request check, not a load benchmark.
+
+The first actual startup run exposed an IPv6 `localhost` readiness probe against an IPv4 Nginx listener; the probe now uses `127.0.0.1`. Browser testing also exposed a Leaflet 1.9 zoom callback firing after route removal. The map uses immediate zoom transitions and stable route points, and the regression flow zooms then immediately navigates away. No browser errors are ignored to make the tests pass.
 
 Run `docker compose up --build -d` and `docker compose --profile test run --rm test` on a machine with Docker to verify that environment. Manual browser checks should cover registration/sign-in, phone/desktop planning, location success or fallback, map display, saving/reopening and PDF download.
 
 ## Real Docker/browser test runner
 
-The `Docker and browser verification` GitHub Actions workflow is prepared but **has not run yet**. It builds the actual images, waits for Compose readiness, runs the scheduler/API tests inside Docker, and launches Chromium through Playwright. It retains screenshots, the downloaded PDF, failure traces, an HTML report and container logs for inspection. It also checks an alternate published port and recreates the stack without deleting the database volume to compare the reopened plan with the original snapshot.
+The `Docker and browser verification` GitHub Actions workflow **passed**. It builds the actual images, waits for Compose readiness, runs the scheduler/API tests inside Docker, and launches Chromium through Playwright. It retains screenshots, the downloaded PDF, failure traces, an HTML report and container logs for inspection. It also checks an alternate published port and recreates the stack without deleting the database volume to compare the reopened plan with the original snapshot. The passing browser suite completed in 33.1 seconds; the API generation sample took 1 ms.
+
+The [passing run's artifact](https://github.com/S-am-ir/PathYatra-Refresh/actions/runs/37763578876/artifacts/11543133954) includes desktop/mobile screenshots, the PDF and HTML report. GitHub artifacts expire after 14 days; the workflow can be rerun to create fresh evidence.
 
 The browser tests exercise the actual result page and Leaflet SVG markers/route, require successfully downloaded live OpenStreetMap tiles, and check desktop and phone-sized screens. They cover registration, browser geolocation with supplied test coordinates, manual origin after permission denial, generation, saving/reopening, PDF download, completion/reviews, deletion and admin maintenance. Supplied browser coordinates are not a physical GPS test. Tile requests are not mocked; an external tile-service/network failure will fail the map check and must be inspected separately.
 

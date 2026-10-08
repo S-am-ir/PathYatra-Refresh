@@ -6,8 +6,10 @@ A Nepal trip planner built with React/Vite, PHP REST endpoints and MariaDB. Base
 
 Install Docker Desktop (or Docker Engine with Compose). No separate PHP, MySQL or Node installation is needed.
 
+The verified functional revision is currently on `ci/docker-browser-check`; `main` has not been merged yet. Clone that branch to test the completed system:
+
 ```sh
-git clone https://github.com/S-am-ir/PathYatra-Refresh.git
+git clone --branch ci/docker-browser-check https://github.com/S-am-ir/PathYatra-Refresh.git
 cd PathYatra-Refresh
 docker compose up --build -d
 ```
@@ -57,7 +59,7 @@ docker compose --profile test run --rm test
 
 See [verification results and limits](docs/VERIFICATION.md).
 
-The prepared `Docker and browser verification` GitHub Actions workflow adds real Chromium checks for desktop/mobile flows, live map tiles, PDF downloads and data surviving container recreation. Its reports include screenshots and container logs. See the verification document for the equivalent local commands and the checks that have actually run.
+The `Docker and browser verification` GitHub Actions workflow passed actual Docker startup, scheduler/API tests, Chromium desktop/mobile flows, live map tiles, PDF downloads, data surviving container recreation and an alternate published port. [View the passing run](https://github.com/S-am-ir/PathYatra-Refresh/actions/runs/37763578876). Its reports include screenshots and container logs. See the verification document for equivalent local commands and remaining device-specific checks.
 
 This runs scheduler invariant tests and HTTP/database flow tests. Integration tests create uniquely named temporary travelers/catalog records and remove them afterward. Use a disposable or local database, not a live deployment.
 
