@@ -2,6 +2,10 @@
 
 A Nepal trip planner built with React/Vite, PHP REST endpoints and MariaDB. Based on [Dokr101/PathYatra](https://github.com/Dokr101/PathYatra), this version completes the traveler and admin flows described in the proposal.
 
+**Use the `ci/docker-browser-check` branch for the completed version.** The repository's default `main` branch still contains the older revision. [Open the completed branch](https://github.com/S-am-ir/PathYatra-Refresh/tree/ci/docker-browser-check) or [view its commit history](https://github.com/S-am-ir/PathYatra-Refresh/commits/ci/docker-browser-check/).
+
+**[Complete Windows/Linux setup guide](docs/SETUP.md)** - official Docker/Git download links, WSL setup, Linux installation, ZIP or Git checkout, startup, accounts, port changes, updates, persistence, tests and troubleshooting.
+
 ## Run with Docker
 
 Install Docker Desktop (or Docker Engine with Compose). No separate PHP, MySQL or Node installation is needed.
